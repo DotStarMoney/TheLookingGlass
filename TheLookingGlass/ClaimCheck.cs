@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace experimental
+namespace TheLookingGlass
 {
     public class ClaimCheck<T> : IEnumerable<T>
     {

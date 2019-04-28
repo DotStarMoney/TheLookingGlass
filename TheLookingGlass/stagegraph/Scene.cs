@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace experimental.StageGraph
+namespace TheLookingGlass.StageGraph
 {
     internal sealed class Scene<ContentType, SharedContentType>
     {

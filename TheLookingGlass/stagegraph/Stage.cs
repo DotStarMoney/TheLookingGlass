@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace experimental.StageGraph
+namespace TheLookingGlass.StageGraph
 {
     internal sealed class Stage<ContentType, SharedContentType>
     {
@@ -9,7 +9,7 @@ namespace experimental.StageGraph
 
         internal string Name { get; }
 
-        private Dictionary<
+        internal Dictionary<
             Version<ContentType, SharedContentType>, 
             Scene<ContentType, SharedContentType>> scenes =
             new Dictionary<Version<ContentType, SharedContentType>, Scene<ContentType, SharedContentType>>();

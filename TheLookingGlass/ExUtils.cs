@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace experimental
+namespace TheLookingGlass
 {
     public class ExUtils
     {

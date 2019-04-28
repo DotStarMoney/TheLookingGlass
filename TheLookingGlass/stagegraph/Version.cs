@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace experimental.StageGraph
+namespace TheLookingGlass.StageGraph
 {
     internal sealed class Version<ContentType, SharedContentType>
     {

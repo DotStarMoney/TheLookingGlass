@@ -2,18 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-//
-// Implement index then check to see if we really need allrefs (allows simplification of 
-// ForEachUniqueNonRootLink) and everywhere we inc allrefs
-//
-// Write a shit-ton of tests. This thing has to be gotten right even if we don't test other components.
-//
-
-namespace experimental.StageGraph
+namespace TheLookingGlass.StageGraph
 {
     public sealed class Graph<ContentType, SharedContentType>
     {
-        private Dictionary<string, Stage<ContentType, SharedContentType>> stages =
+        internal Dictionary<string, Stage<ContentType, SharedContentType>> stages =
             new Dictionary<string, Stage<ContentType, SharedContentType>>();
 
         internal HashSet<Version<ContentType, SharedContentType>> versions =
@@ -22,7 +15,7 @@ namespace experimental.StageGraph
         internal HashSet<Version<ContentType, SharedContentType>> frontier = 
             new HashSet<Version<ContentType, SharedContentType>>();
 
-        private Version<ContentType, SharedContentType> RootVersion { get; }
+        internal Version<ContentType, SharedContentType> RootVersion { get; }
 
         internal Stage<ContentType, SharedContentType> GetStage(in string name)
         {
@@ -30,7 +23,7 @@ namespace experimental.StageGraph
             throw ExUtils.RuntimeException("Stage \"{0}\" not found.", name);
         }
 
-        internal void Compact()
+        public void Compact()
         {
             PurgeVersions(GetOrphanedVersions());
             var orphanedScenes = IsolateOrphanedScenes();
@@ -256,10 +249,7 @@ namespace experimental.StageGraph
             return new Index<ContentType, SharedContentType>(this, RootVersion, GetStage(stageName));
         }
 
-        public Builder NewBuilder()
-        {
-            return new Builder();
-        }
+        public static Builder NewBuilder() => new Builder();
 
         public sealed class Builder
         {
