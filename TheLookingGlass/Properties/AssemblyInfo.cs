@@ -36,4 +36,6 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyFileVersion("1.0.0.0")]
 
 // For tests.
+#if DEBUG
 [assembly: InternalsVisibleTo("TheLookingGlassTests")]
+#endif
