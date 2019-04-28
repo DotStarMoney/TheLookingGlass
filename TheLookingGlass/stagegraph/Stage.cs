@@ -58,7 +58,7 @@ namespace experimental.StageGraph
 
         internal void ForEachScene(in Action<Scene<ContentType, SharedContentType>> fn)
         {
-            foreach (var sceneEntry in scenes) fn(obj: sceneEntry.Value);
+            foreach (var sceneEntry in scenes) fn(sceneEntry.Value);
         }
     }
 }

@@ -4,40 +4,78 @@ namespace experimental.StageGraph
 {
     internal sealed class Scene<ContentType, SharedContentType>
     {
-        internal Stage<ContentType, SharedContentType> Owner { get; }
+        internal Stage<ContentType, SharedContentType> Stage { get; }
 
-        internal ContentType Content { get; }
+        private ContentType content;
+
+        internal ContentType Content
+        {
+            get
+            {
+                if (content == null)
+                {
+                    throw ExUtils.RuntimeException("Content not set.");
+                }
+                return content;
+            }
+            set => content = value;
+        }
 
         internal Version<ContentType, SharedContentType> Version { get; }
 
         internal Scene<ContentType, SharedContentType> Basis { get; }
 
-        private ClaimCheck<Scene<ContentType, SharedContentType>> descendants = 
-            new ClaimCheck<Scene<ContentType, SharedContentType>>();
-
-        internal Scene(in Stage<ContentType, SharedContentType> owner, in ContentType content,
-            in Version<ContentType, SharedContentType> version, 
+        private ClaimCheck<Descendant> descendants = new ClaimCheck<Descendant>();
+        internal Scene(
+            in Stage<ContentType, SharedContentType> owner,
+            in Version<ContentType, SharedContentType> version,
             in Scene<ContentType, SharedContentType> basis = null)
         {
-            this.Owner = owner;
-            this.Content = content;
+            this.Stage = owner;
             this.Version = version;
             this.Basis = basis;
         }
 
-        internal void ForEachDescendant(in Action<Scene<ContentType, SharedContentType>> fn)
+        internal Scene(
+            in Stage<ContentType, SharedContentType> owner,
+            in ContentType content,
+            in Version<ContentType, SharedContentType> version, 
+            in Scene<ContentType, SharedContentType> basis = null) : this(owner, version, basis)
         {
-            foreach (var descendant in descendants) fn(obj: descendant);
+            this.content = content;            
         }
 
-        internal EmbedToken AddDescendant(in Scene<ContentType, SharedContentType> descendant)
+        internal void SetContent(in ContentType newContent) => content = newContent;
+
+        internal void ForEachDescendant(
+            in Action<Scene<ContentType, SharedContentType>, Version<ContentType, SharedContentType>> fn)
         {
-            return new EmbedToken(descendants.Add(descendant));
+            foreach (var descendant in descendants) fn(descendant.Target, descendant.ObservedAt);
         }
 
-        internal void RemoveDescendant(in EmbedToken token)
+        internal EmbedToken AddDescendant(
+            in Scene<ContentType, SharedContentType> target, 
+            in Version<ContentType, SharedContentType> observedAt)
         {
-            descendants.Remove(token.LookupId);
+            return new EmbedToken(descendants.Add(new Descendant(target, observedAt)));
+        }
+
+        internal Descendant RemoveDescendant(in EmbedToken token) => descendants.Remove(token.LookupId);
+
+        internal Descendant GetDescendant(in EmbedToken token) => descendants.Get(token.LookupId);
+
+        internal sealed class Descendant
+        {
+            internal Scene<ContentType, SharedContentType> Target { get; }
+            internal Version<ContentType, SharedContentType> ObservedAt { get; }
+
+            internal Descendant(
+                in Scene<ContentType, SharedContentType> target,
+                in Version<ContentType, SharedContentType> observedAt)
+            {
+                this.Target = target;
+                this.ObservedAt = observedAt;
+            }
         }
     }
 }

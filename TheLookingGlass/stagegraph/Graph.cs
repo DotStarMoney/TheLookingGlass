@@ -2,6 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
+//
+// Implement index then check to see if we really need allrefs (allows simplification of 
+// ForEachUniqueNonRootLink) and everywhere we inc allrefs
+//
+// Write a shit-ton of tests. This thing has to be gotten right even if we don't test other components.
+//
+
 namespace experimental.StageGraph
 {
     public sealed class Graph<ContentType, SharedContentType>
@@ -9,10 +16,10 @@ namespace experimental.StageGraph
         private Dictionary<string, Stage<ContentType, SharedContentType>> stages =
             new Dictionary<string, Stage<ContentType, SharedContentType>>();
 
-        private HashSet<Version<ContentType, SharedContentType>> versions =
+        internal HashSet<Version<ContentType, SharedContentType>> versions =
             new HashSet<Version<ContentType, SharedContentType>>();
 
-        private HashSet<Version<ContentType, SharedContentType>> frontier = 
+        internal HashSet<Version<ContentType, SharedContentType>> frontier = 
             new HashSet<Version<ContentType, SharedContentType>>();
 
         private Version<ContentType, SharedContentType> RootVersion { get; }
@@ -27,24 +34,40 @@ namespace experimental.StageGraph
         {
             PurgeVersions(GetOrphanedVersions());
             var orphanedScenes = IsolateOrphanedScenes();
+
+            List<Version<ContentType, SharedContentType>> emptyVersions =
+                new List<Version<ContentType, SharedContentType>>();
             foreach (var scene in orphanedScenes)
             {
-                var sceneVersion = scene.Version;
-                scene.ForEachDescendant(descendantScene =>
+                PurgeScene(scene);
+                if (!scene.Version.InStages.Any())
                 {
-                    var descendantVersion = descendantScene.Version;
-                    sceneVersion.DecLinksToEmbeddedVersion(descendantVersion);
-                    descendantVersion.DecAllRefs();
-                    descendantVersion.DecParentN();
+                    emptyVersions.Add(scene.Version);
+                }
+            }
+
+            foreach (var version in emptyVersions)
+            {
+                version.ForEachUniqueNonRootLink(linkedVersion =>
+                {
+                    if (!versions.Contains(linkedVersion)) return;
+                    linkedVersion.DecParentN();
                 });
-                sceneVersion.RemoveStage(scene.Owner);
-                scene.Owner.RemoveScene(sceneVersion);
+                versions.Remove(version);
             }
         }
 
         private void PurgeScene(in Scene<ContentType, SharedContentType> scene)
         {
-
+            var sceneVersion = scene.Version;
+            scene.ForEachDescendant((descendantScene, _) =>
+            {
+                var descendantVersion = descendantScene.Version;
+                sceneVersion.DecLinksToEmbeddedVersion(descendantVersion);
+                descendantVersion.DecParentN();
+            });
+            sceneVersion.RemoveStage(scene.Stage);
+            scene.Stage.RemoveScene(sceneVersion);
         }
 
         private HashSet<Scene<ContentType, SharedContentType>> IsolateOrphanedScenes()
@@ -69,7 +92,7 @@ namespace experimental.StageGraph
                 {
                     if (orphanedScenes.Remove(scene))
                     {
-                        scene.ForEachDescendant(descendant =>
+                        scene.ForEachDescendant((descendant, _) =>
                         {
                             exploreVersions.Push(new CompactStageMask(descendant.Version, GetAllStages()));
                         });
@@ -125,7 +148,7 @@ namespace experimental.StageGraph
             in Version<ContentType, SharedContentType> version, 
             in Action<Scene<ContentType, SharedContentType>> fn)
         {
-            foreach(var stage in version.InStages) fn(obj: stage.GetScene(version));
+            foreach(var stage in version.InStages) fn(stage.GetScene(version));
         }
 
         private HashSet<Stage<ContentType, SharedContentType>> GetAllStages()
@@ -228,14 +251,9 @@ namespace experimental.StageGraph
         {
             lock(RootVersion)
             {
-                RootVersion.IncAllRefs();
                 RootVersion.IncIndexRefs();
             }
-            //
-            //
-            return new Index<ContentType, SharedContentType>(/* STUFF HERE */);
-            //
-            //
+            return new Index<ContentType, SharedContentType>(this, RootVersion, GetStage(stageName));
         }
 
         public Builder NewBuilder()
