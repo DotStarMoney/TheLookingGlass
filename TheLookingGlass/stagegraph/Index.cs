@@ -72,7 +72,13 @@ namespace TheLookingGlass.StageGraph
 
             if (version.Overwritable() && (version == scene.Version))
             {
-                scene.SetContent(contentProvider(EmbedInDescendants(version, scene, toEmbed)));
+                if (linkBase)
+                {
+                    var dummyScene = new Scene<ContentType, SharedContentType>(null, null, scene.Basis);
+                    dummyScene.Content = scene.Content;
+                    scene.basis = dummyScene;
+                }
+                scene.Content = contentProvider(EmbedInDescendants(version, scene, toEmbed));
                 return;
             }
 
@@ -86,10 +92,7 @@ namespace TheLookingGlass.StageGraph
                 graph.versions.Add(updatedVersion);
                 updatedVersion.AddStage(stage);
 
-                if (graph.frontier.Remove(version))
-                {
-                    graph.frontier.Add(updatedVersion);
-                }
+                if (graph.frontier.Remove(version)) graph.frontier.Add(updatedVersion);
             }
             else
             {
@@ -99,7 +102,7 @@ namespace TheLookingGlass.StageGraph
             var newScene = new Scene<ContentType, SharedContentType>(
                 stage,
                 updatedVersion,
-                linkBase ? scene.Basis : null);
+                linkBase ? scene : null);
 
             scene.ForEachDescendant((target, observedAt) =>
             {
@@ -192,8 +195,6 @@ namespace TheLookingGlass.StageGraph
             Invalidate();
 
             version.DecIndexRefs();
-
-            graph.Compact();
         }
 
         public bool IsValid() => graph != null;

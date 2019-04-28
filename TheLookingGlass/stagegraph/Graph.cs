@@ -61,6 +61,7 @@ namespace TheLookingGlass.StageGraph
             });
             sceneVersion.RemoveStage(scene.Stage);
             scene.Stage.RemoveScene(sceneVersion);
+            scene.ClearForGc();
         }
 
         private HashSet<Scene<ContentType, SharedContentType>> IsolateOrphanedScenes()
@@ -160,7 +161,7 @@ namespace TheLookingGlass.StageGraph
         {
             foreach (var version in versionsToPurge)
             {
-                frontier.Remove(version);
+                _ = frontier.Remove(version);
 
                 version.ForEachUniqueNonRootLink(linkedVersion =>
                 {

@@ -48,7 +48,7 @@ namespace TheLookingGlass.StageGraph
 
         internal bool Overwritable()
         {
-            if (indexRefN > 0)
+            if (indexRefN == 0)
             {
                 throw ExUtils.RuntimeException("Version should only be tested for overwrite when "
                     + "referenced at least once in {0}.", this);

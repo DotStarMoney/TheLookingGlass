@@ -1,4 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Collections.Generic;
+
 using TheLookingGlass.StageGraph;
 
 namespace TheLookingGlassTests
@@ -9,49 +12,155 @@ namespace TheLookingGlassTests
         [TestMethod]
         public void GraphBuilder_BuildsExpectedGraph_WhenBuiltWithMultipleStages()
         {
+            var graph = CreateTestGraph();
+
+            Assert.AreEqual(1, graph.versions.Count);
+            Assert.AreEqual(3, graph.stages.Count);
+            Assert.AreEqual(1, graph.frontier.Count);
+
+            var stageA = graph.stages["A"];
+            Assert.AreEqual(1, stageA.scenes.Count);
+            Assert.AreEqual("A", stageA.Name);
+            Assert.AreEqual("shared_content_A", stageA.SharedContent);
+
+            var stageAScene = stageA.scenes[graph.RootVersion];
+            Assert.AreEqual(null, stageAScene.Basis);
+            Assert.AreEqual(stageA, stageAScene.Stage);
+            Assert.AreEqual(graph.RootVersion, stageAScene.Version);
+            Assert.AreEqual("content_A", stageAScene.Content);
+
+            var stageB = graph.stages["B"];
+            Assert.AreEqual(1, stageB.scenes.Count);
+            Assert.AreEqual("B", stageB.Name);
+            Assert.AreEqual("shared_content_B", stageB.SharedContent);
+
+            var stageBScene = stageB.scenes[graph.RootVersion];
+            Assert.AreEqual(null, stageBScene.Basis);
+            Assert.AreEqual(stageB, stageBScene.Stage);
+            Assert.AreEqual(graph.RootVersion, stageBScene.Version);
+            Assert.AreEqual("content_B", stageBScene.Content);
+
+            var stageC = graph.stages["C"];
+            Assert.AreEqual(1, stageC.scenes.Count);
+            Assert.AreEqual("C", stageC.Name);
+            Assert.AreEqual("shared_content_C", stageC.SharedContent);
+
+            var stageCScene = stageC.scenes[graph.RootVersion];
+            Assert.AreEqual(null, stageCScene.Basis);
+            Assert.AreEqual(stageC, stageCScene.Stage);
+            Assert.AreEqual(graph.RootVersion, stageCScene.Version);
+            Assert.AreEqual("content_C", stageCScene.Content);
+        }
+
+        [TestMethod]
+        public void 
+            IndexGetContent_ReturnsContentAtDifferentIndex_WhenStageHasNoContentAtCurrentIndexVersion()
+        {
+            var graph = CreateTestGraph();
+
+            var index = graph.NewIndex("A");
+            Assert.AreEqual("content_A", index.GetContent());
+
+            index.SetContent("content_A_v1");
+            Assert.AreEqual("content_A_v1", index.GetContent());
+
+            index.Go("B");
+            Assert.AreEqual("content_B", index.GetContent());
+        
+            Assert.AreEqual(2, graph.versions.Count);
+        }
+
+        [TestMethod]
+        public void IndexSetContent_DoesntCreateNewVersion_WhenStageHasNoContentAtCurrentIndexVersion()
+        {
+            var graph = CreateTestGraph();
+
+            var index = graph.NewIndex("A");
+            Assert.AreEqual("content_A", index.GetContent());
+
+            index.SetContent("content_A_v1");
+            Assert.AreEqual("content_A_v1", index.GetContent());
+
+            index.Go("B");
+            Assert.AreEqual("content_B", index.GetContent());
+
+            index.SetContent("content_B_v1");
+            Assert.AreEqual("content_B_v1", index.GetContent());
+
+            Assert.AreEqual(2, graph.versions.Count);
+        }
+
+        [TestMethod]
+        public void IndexGetContent_ReturnsContentInReverseOrder_WhenSetWithLinkedBases()
+        {
+            var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
+
+            var index = graph.NewIndex("A");
+            index.SetContent("content_A_v1", true);
+            index.SetContent("content_A_v2", true);
+
+            List<string> contentList = new List<string>();
+            index.GetContent(content => contentList.Add(content));
+
+            Assert.AreEqual(3, contentList.Count);
+            Assert.AreEqual("content_A", contentList[0]);
+            Assert.AreEqual("content_A_v1", contentList[1]);
+            Assert.AreEqual("content_A_v2", contentList[2]);
+
+            Assert.AreEqual(2, graph.versions.Count);
+        }
+
+        [TestMethod]
+        public void IndexGetContent_ReturnsSingleContent_WhenSetWithNoLinkedBase()
+        {
+            var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
+
+            var index = graph.NewIndex("A");
+            index.SetContent("content_A_v1");
+            index.SetContent("content_A_v2");
+
+            List<string> contentList = new List<string>();
+            index.GetContent(content => contentList.Add(content));
+
+            Assert.AreEqual(1, contentList.Count);
+            Assert.AreEqual("content_A_v2", contentList[0]);
+
+            Assert.AreEqual(2, graph.versions.Count);
+        }
+
+        [TestMethod]
+        public void IndexGetContent_ThrowsInvalidOperationEx_WhenLinkedBaseSetButSingleValueRequested()
+        {
+            var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
+
+            var index = graph.NewIndex("A");
+            index.SetContent("content_A_v1", true);
+            index.SetContent("content_A_v2", true);
+
+            Assert.ThrowsException<InvalidOperationException>(() => index.GetContent());
+        }
+
+
+        // Test remaining paths in set.
+        // Test unembed variants
+        // Test clone
+        // Test replace
+        // Test release
+
+        // Test compact removes a dead version
+        // Test compact removes a dead scene
+
+        // Test complex index and compact scenarios
+
+   
+        private static Graph<string, string> CreateTestGraph()
+        {
             var builder = Graph<string, string>.NewBuilder();
             builder.Add("A", "content_A", "shared_content_A");
             builder.Add("B", "content_B", "shared_content_B");
             builder.Add("C", "content_C", "shared_content_C");
 
-            var graph = builder.Build();
-
-            Assert.AreEqual(graph.versions.Count, 1);
-            Assert.AreEqual(graph.stages.Count, 3);
-            Assert.AreEqual(graph.frontier.Count, 1);
-
-            var stageA = graph.stages["A"];
-            Assert.AreEqual(stageA.scenes.Count, 1);
-            Assert.AreEqual(stageA.Name, "A");
-            Assert.AreEqual(stageA.SharedContent, "shared_content_A");
-
-            var stageAScene = stageA.scenes[graph.RootVersion];
-            Assert.AreEqual(stageAScene.Basis, null);
-            Assert.AreEqual(stageAScene.Stage, stageA);
-            Assert.AreEqual(stageAScene.Version, graph.RootVersion);
-            Assert.AreEqual(stageAScene.Content, "content_A");
-
-            var stageB = graph.stages["B"];
-            Assert.AreEqual(stageB.scenes.Count, 1);
-            Assert.AreEqual(stageB.Name, "B");
-            Assert.AreEqual(stageB.SharedContent, "shared_content_B");
-
-            var stageBScene = stageB.scenes[graph.RootVersion];
-            Assert.AreEqual(stageBScene.Basis, null);
-            Assert.AreEqual(stageBScene.Stage, stageB);
-            Assert.AreEqual(stageBScene.Version, graph.RootVersion);
-            Assert.AreEqual(stageBScene.Content, "content_B");
-
-            var stageC = graph.stages["C"];
-            Assert.AreEqual(stageC.scenes.Count, 1);
-            Assert.AreEqual(stageC.Name, "C");
-            Assert.AreEqual(stageC.SharedContent, "shared_content_C");
-
-            var stageCScene = stageC.scenes[graph.RootVersion];
-            Assert.AreEqual(stageCScene.Basis, null);
-            Assert.AreEqual(stageCScene.Stage, stageC);
-            Assert.AreEqual(stageCScene.Version, graph.RootVersion);
-            Assert.AreEqual(stageCScene.Content, "content_C");
+            return builder.Build();
         }
     }
 }

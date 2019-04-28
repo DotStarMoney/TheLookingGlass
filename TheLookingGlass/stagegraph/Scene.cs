@@ -4,7 +4,9 @@ namespace TheLookingGlass.StageGraph
 {
     internal sealed class Scene<ContentType, SharedContentType>
     {
-        internal Stage<ContentType, SharedContentType> Stage { get; }
+        internal Stage<ContentType, SharedContentType> stage;
+
+        internal Stage<ContentType, SharedContentType> Stage { get => stage; }
 
         private ContentType content;
 
@@ -21,9 +23,13 @@ namespace TheLookingGlass.StageGraph
             set => content = value;
         }
 
-        internal Version<ContentType, SharedContentType> Version { get; }
+        private Version<ContentType, SharedContentType> version;
 
-        internal Scene<ContentType, SharedContentType> Basis { get; }
+        internal Version<ContentType, SharedContentType> Version { get => version; }
+
+        internal Scene<ContentType, SharedContentType> basis;
+
+        internal Scene<ContentType, SharedContentType> Basis { get => basis; }
 
         private ClaimCheck<Descendant> descendants = new ClaimCheck<Descendant>();
         internal Scene(
@@ -31,9 +37,9 @@ namespace TheLookingGlass.StageGraph
             in Version<ContentType, SharedContentType> version,
             in Scene<ContentType, SharedContentType> basis = null)
         {
-            this.Stage = owner;
-            this.Version = version;
-            this.Basis = basis;
+            this.stage = owner;
+            this.version = version;
+            this.basis = basis;
         }
 
         internal Scene(
@@ -44,8 +50,6 @@ namespace TheLookingGlass.StageGraph
         {
             this.content = content;            
         }
-
-        internal void SetContent(in ContentType newContent) => content = newContent;
 
         internal void ForEachDescendant(
             in Action<Scene<ContentType, SharedContentType>, Version<ContentType, SharedContentType>> fn)
@@ -76,6 +80,13 @@ namespace TheLookingGlass.StageGraph
                 this.Target = target;
                 this.ObservedAt = observedAt;
             }
+        }
+
+        internal void ClearForGc()
+        {
+            basis = null;
+            stage = null;
+            version = null;
         }
     }
 }
