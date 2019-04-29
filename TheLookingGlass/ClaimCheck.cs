@@ -26,7 +26,7 @@ namespace TheLookingGlass
             this.elements = new List<Element>(other.elements);
         }
 
-        public int Size { get { return usedSize; } }
+        public int Count { get { return usedSize; } }
 
         public int Add(in T x)
         {
@@ -140,9 +140,12 @@ namespace TheLookingGlass
         {
             if (usedSize > 0)
             {
-                for (int i = lastValidIndex; i != elements[i].prevIndex; i = elements[i].prevIndex)
+                int i = lastValidIndex;
+                for (; ;)
                 {
                     yield return elements[i].x;
+                    if (i == elements[i].prevIndex) yield break;
+                    i = elements[i].prevIndex;
                 }
             }
         }

@@ -140,8 +140,68 @@ namespace TheLookingGlassTests
             Assert.ThrowsException<InvalidOperationException>(() => index.GetContent());
         }
 
+        [TestMethod]
+        public void IndexSetContent_LinksScenes_WhenLinkingBasesFromDifferentVersions()
+        {
+            var graph = CreateTestGraph();
 
-        // Test remaining paths in set.
+            var index = graph.NewIndex("A");
+            index.SetContent("content_A_v1", true);
+
+            var unused1 = index.Clone();
+            index.SetContent("content_A_v2", true);
+
+            List<string> contentList = new List<string>();
+            index.GetContent(content => contentList.Add(content));
+
+            Assert.AreEqual(3, contentList.Count);
+            Assert.AreEqual("content_A", contentList[0]);
+            Assert.AreEqual("content_A_v1", contentList[1]);
+            Assert.AreEqual("content_A_v2", contentList[2]);
+
+            Assert.AreEqual(3, graph.versions.Count);
+        }
+
+        [TestMethod]
+        public void IndexSetContent_CopiesSceneDescendants_WhenNewSceneAdded()
+        {
+            var builder = Graph<EmbedToken, string>.NewBuilder();
+            builder.Add("A", null, "shared_content_A");
+            builder.Add("B", null, "shared_content_B");
+
+            var graph = builder.Build();
+
+            var index = graph.NewIndex("A");
+
+            index.Go("B");
+            var embedMeIndex = index.Clone();
+
+            index.Go("A");
+            index.SetContent(
+                tokens => {
+                    EmbedToken token = null;
+                    foreach (var curToken in tokens)
+                    {
+                        Assert.AreEqual(null, token);
+                        token = curToken;
+                    }
+                    return token;
+                }, 
+                new List<Index<EmbedToken, string>> { embedMeIndex });
+
+            Assert.IsFalse(embedMeIndex.IsValid());
+
+            var embedMeIndex2 = index.Clone();
+
+            index.SetContent(null);
+
+            Assert.AreEqual(3, graph.versions.Count);
+
+            var indexScene = index.stage.GetScene(index.version);
+
+            Assert.AreEqual(1, indexScene.descendants.Count);
+        }
+
         // Test unembed variants
         // Test clone
         // Test replace
@@ -152,7 +212,7 @@ namespace TheLookingGlassTests
 
         // Test complex index and compact scenarios
 
-   
+
         private static Graph<string, string> CreateTestGraph()
         {
             var builder = Graph<string, string>.NewBuilder();

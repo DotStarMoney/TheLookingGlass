@@ -8,9 +8,9 @@ namespace TheLookingGlass.StageGraph
     {
         private Graph<ContentType, SharedContentType> graph;
 
-        private Version<ContentType, SharedContentType> version;
+        internal Version<ContentType, SharedContentType> version;
 
-        private Stage<ContentType, SharedContentType> stage;
+        internal Stage<ContentType, SharedContentType> stage;
 
         internal Index(
             in Graph<ContentType, SharedContentType> graph,
@@ -70,18 +70,6 @@ namespace TheLookingGlass.StageGraph
             CheckValid();
             var scene = stage.GetScene(version);
 
-            if (version.Overwritable() && (version == scene.Version))
-            {
-                if (linkBase)
-                {
-                    var dummyScene = new Scene<ContentType, SharedContentType>(null, null, scene.Basis);
-                    dummyScene.Content = scene.Content;
-                    scene.basis = dummyScene;
-                }
-                scene.Content = contentProvider(EmbedInDescendants(version, scene, toEmbed));
-                return;
-            }
-
             var updatedVersion = version;
             if (!version.Overwritable())
             {
@@ -96,6 +84,17 @@ namespace TheLookingGlass.StageGraph
             }
             else
             {
+                if (version == scene.Version)
+                {
+                    if (linkBase)
+                    {
+                        var dummyScene = new Scene<ContentType, SharedContentType>(null, null, scene.Basis);
+                        dummyScene.Content = scene.Content;
+                        scene.basis = dummyScene;
+                    }
+                    scene.Content = contentProvider(EmbedInDescendants(version, scene, toEmbed));
+                    return;
+                }
                 updatedVersion.AddStage(stage);
             }
 

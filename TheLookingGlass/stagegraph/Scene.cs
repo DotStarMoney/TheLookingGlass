@@ -31,7 +31,7 @@ namespace TheLookingGlass.StageGraph
 
         internal Scene<ContentType, SharedContentType> Basis { get => basis; }
 
-        private ClaimCheck<Descendant> descendants = new ClaimCheck<Descendant>();
+        internal ClaimCheck<Descendant> descendants = new ClaimCheck<Descendant>();
         internal Scene(
             in Stage<ContentType, SharedContentType> owner,
             in Version<ContentType, SharedContentType> version,
@@ -84,7 +84,6 @@ namespace TheLookingGlass.StageGraph
 
         internal void ClearForGc()
         {
-            basis = null;
             stage = null;
             version = null;
         }
