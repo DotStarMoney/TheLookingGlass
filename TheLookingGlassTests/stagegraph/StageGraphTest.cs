@@ -201,7 +201,7 @@ namespace TheLookingGlassTests
         }
 
         [TestMethod]
-        public void IndexUnembed_ReconstructsIndex_WhenUnembedded()
+        public void IndexUnembed_ReconstructsIndexAndRemovesEmbed_WhenUnembedded()
         {
             var graph = Graph<EmbedToken, string>.NewBuilder()
                 .Add("A", new EmbedToken(-1), "shared_content_A")
@@ -237,8 +237,49 @@ namespace TheLookingGlassTests
             Assert.AreEqual(0, rescuedIndex.stage.GetScene(rescuedIndex.version).descendants.Count);
         }
 
-        // Test unembed variants
-        // Test clone
+        [TestMethod]
+        public void IndexIndexFromEmbedded_ReconstructsIndex_WhenUnembedded()
+        {
+            var graph = Graph<EmbedToken, string>.NewBuilder()
+                .Add("A", new EmbedToken(-1), "shared_content_A")
+                .Build();
+
+            var index = graph.CreateIndex("A");
+            Assert.AreEqual(-1, index.GetContent().LookupId);
+
+            var embedMeIndex = index.Clone();
+            int tokenId = -1;
+            index.SetContent(
+                tokens => {
+                    EmbedToken token = null;
+                    foreach (var curToken in tokens)
+                    {
+                        Assert.AreEqual(null, token);
+                        token = curToken;
+                        tokenId = token.LookupId;
+                    }
+                    return token;
+                },
+                new List<Index<EmbedToken, string>> { embedMeIndex });
+
+            Assert.IsFalse(embedMeIndex.IsValid());
+            Assert.AreEqual(1, index.stage.GetScene(index.version).descendants.Count);
+
+            Assert.AreEqual(tokenId, index.GetContent().LookupId);
+
+            var rescuedIndex = index.IndexFromEmbedded(index.GetContent());
+            Assert.AreEqual(-1, rescuedIndex.GetContent().LookupId);
+
+            Assert.AreEqual(1, index.stage.GetScene(index.version).descendants.Count);
+            Assert.AreEqual(0, rescuedIndex.stage.GetScene(rescuedIndex.version).descendants.Count);
+        }
+
+        [TestMethod]
+        public void IndexClone_ProducesIndexThatTracksVersion_WhenClonedFromVersionThatHasSetContent()
+        {
+
+        }
+
         // Test replace
         // Test release
 

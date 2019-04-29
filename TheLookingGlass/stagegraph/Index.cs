@@ -162,7 +162,7 @@ namespace TheLookingGlass.StageGraph
             CheckValid();
             var scene = stage.GetScene(version);
 
-            var descendant = scene.RemoveDescendant(token);
+            var descendant = scene.GetDescendant(token);
             descendant.ObservedAt.IncIndexRefs();
 
             return new Index<ContentType, SharedContentType>(
