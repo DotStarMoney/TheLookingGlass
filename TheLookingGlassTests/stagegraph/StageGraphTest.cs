@@ -58,7 +58,7 @@ namespace TheLookingGlassTests
         {
             var graph = CreateTestGraph();
 
-            var index = graph.NewIndex("A");
+            var index = graph.CreateIndex("A");
             Assert.AreEqual("content_A", index.GetContent());
 
             index.SetContent("content_A_v1");
@@ -75,7 +75,7 @@ namespace TheLookingGlassTests
         {
             var graph = CreateTestGraph();
 
-            var index = graph.NewIndex("A");
+            var index = graph.CreateIndex("A");
             Assert.AreEqual("content_A", index.GetContent());
 
             index.SetContent("content_A_v1");
@@ -95,7 +95,7 @@ namespace TheLookingGlassTests
         {
             var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
 
-            var index = graph.NewIndex("A");
+            var index = graph.CreateIndex("A");
             index.SetContent("content_A_v1", true);
             index.SetContent("content_A_v2", true);
 
@@ -115,7 +115,7 @@ namespace TheLookingGlassTests
         {
             var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
 
-            var index = graph.NewIndex("A");
+            var index = graph.CreateIndex("A");
             index.SetContent("content_A_v1");
             index.SetContent("content_A_v2");
 
@@ -133,7 +133,7 @@ namespace TheLookingGlassTests
         {
             var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
 
-            var index = graph.NewIndex("A");
+            var index = graph.CreateIndex("A");
             index.SetContent("content_A_v1", true);
             index.SetContent("content_A_v2", true);
 
@@ -145,7 +145,7 @@ namespace TheLookingGlassTests
         {
             var graph = CreateTestGraph();
 
-            var index = graph.NewIndex("A");
+            var index = graph.CreateIndex("A");
             index.SetContent("content_A_v1", true);
 
             var unused1 = index.Clone();
@@ -171,7 +171,7 @@ namespace TheLookingGlassTests
 
             var graph = builder.Build();
 
-            var index = graph.NewIndex("A");
+            var index = graph.CreateIndex("A");
 
             index.Go("B");
             var embedMeIndex = index.Clone();
@@ -197,9 +197,44 @@ namespace TheLookingGlassTests
 
             Assert.AreEqual(3, graph.versions.Count);
 
-            var indexScene = index.stage.GetScene(index.version);
+            Assert.AreEqual(1, index.stage.GetScene(index.version).descendants.Count);
+        }
 
-            Assert.AreEqual(1, indexScene.descendants.Count);
+        [TestMethod]
+        public void IndexUnembed_ReconstructsIndex_WhenUnembedded()
+        {
+            var graph = Graph<EmbedToken, string>.NewBuilder()
+                .Add("A", new EmbedToken(-1), "shared_content_A")
+                .Build();
+
+            var index = graph.CreateIndex("A");
+            Assert.AreEqual(-1, index.GetContent().LookupId);
+
+            var embedMeIndex = index.Clone();
+            int tokenId = -1;
+            index.SetContent(
+                tokens => {
+                    EmbedToken token = null;
+                    foreach (var curToken in tokens)
+                    {
+                        Assert.AreEqual(null, token);
+                        token = curToken;
+                        tokenId = token.LookupId;
+                    }
+                    return token;
+                },
+                new List<Index<EmbedToken, string>> { embedMeIndex });
+
+            Assert.IsFalse(embedMeIndex.IsValid());
+            Assert.AreEqual(1, index.stage.GetScene(index.version).descendants.Count);
+
+            Assert.AreEqual(tokenId, index.GetContent().LookupId);
+
+            var rescuedIndex = index.Unembed(index.GetContent());
+            Assert.AreEqual(-1, rescuedIndex.GetContent().LookupId);
+
+            Assert.AreEqual(0, index.stage.GetScene(index.version).descendants.Count);
+            Assert.AreEqual(0, rescuedIndex.stage.GetScene(rescuedIndex.version).descendants.Count);
         }
 
         // Test unembed variants

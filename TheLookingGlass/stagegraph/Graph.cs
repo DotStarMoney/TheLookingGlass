@@ -241,7 +241,7 @@ namespace TheLookingGlass.StageGraph
             }
         }
 
-        public Index<ContentType, SharedContentType> NewIndex(in string stageName)
+        public Index<ContentType, SharedContentType> CreateIndex(in string stageName)
         {
             lock(RootVersion)
             {
