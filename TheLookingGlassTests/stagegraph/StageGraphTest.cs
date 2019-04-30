@@ -312,7 +312,7 @@ namespace TheLookingGlassTests
         }
 
         [TestMethod]
-        public void GraphCompact_RemovesScene_WhenNoLongerAccessible()
+        public void GraphCompact_RemovesScene_WhenSceneIsNoLongerAccessible()
         {
             var builder = Graph<string, string>.NewBuilder();
             builder.Add("A", "content_A", "shared_content_A");
@@ -351,9 +351,57 @@ namespace TheLookingGlassTests
             Assert.AreEqual("content_B_v1", index.GetContent());
         }
 
-        // Test compact removes an orphaned version
+        [TestMethod]
+        public void GraphCompact_RemovesVersion_WhenVersionIsNoLongerAccessible()
+        {
+            var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
 
-        // Test 3 complex index and compact scenarios
+            var index = graph.CreateIndex("A");
+            index.SetContent("content_A_v1");
+
+            var olderIndex = index.Clone();
+
+            index.SetContent("content_A_v2");
+
+            index.Release();
+
+            Assert.AreEqual("content_A_v1", olderIndex.GetContent());
+            Assert.AreEqual(3, graph.versions.Count);
+
+            graph.Compact();
+
+            Assert.AreEqual("content_A_v1", olderIndex.GetContent());
+            Assert.AreEqual(2, graph.versions.Count);
+        }
+
+        [TestMethod]
+        public void GraphCompact_RemovesVersion_WhenVersionsScenesAreNoLongerAccessible()
+        {
+            var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
+
+            var index = graph.CreateIndex("A");
+            index.SetContent("content_A_v1");
+
+            var olderIndex = index.Clone();
+
+            index.SetContent("content_A_v2");
+
+            olderIndex.Release();
+
+            Assert.AreEqual("content_A_v2", index.GetContent());
+            Assert.AreEqual(3, graph.versions.Count);
+
+            graph.Compact();
+
+            Assert.AreEqual("content_A_v2", index.GetContent());
+            Assert.AreEqual(2, graph.versions.Count);
+        }
+
+        [TestMethod]
+        public void GraphCompact_RemovesScenesAndVersions_WhenGraphHasBothOrphanedScenesAndVersions()
+        {
+            
+        }
 
         private static Graph<string, string> CreateTestGraph()
         {
