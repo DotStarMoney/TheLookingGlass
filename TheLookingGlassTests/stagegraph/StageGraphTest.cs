@@ -277,17 +277,83 @@ namespace TheLookingGlassTests
         [TestMethod]
         public void IndexClone_ProducesIndexThatTracksVersion_WhenClonedFromVersionThatHasSetContent()
         {
+            var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
 
+            var index = graph.CreateIndex("A");
+            index.SetContent("content_A_v1");
+
+            var olderIndex = index.Clone();
+
+            index.SetContent("content_A_v2");
+
+            Assert.AreEqual("content_A_v1", olderIndex.GetContent());
+            Assert.AreEqual("content_A_v2", index.GetContent());
         }
 
-        // Test replace
-        // Test release
+        [TestMethod]
+        public void IndexReplace_ReplacesIndexWithNewContent_WhenCalledOnIndexAtOlderVersion()
+        {
+            var graph = Graph<string, string>.NewBuilder().Add("A", "content_A", "shared_content_A").Build();
 
-        // Test compact removes a dead version
-        // Test compact removes a dead scene
+            var index = graph.CreateIndex("A");
+            index.SetContent("content_A_v1");
 
-        // Test complex index and compact scenarios
+            var olderIndex = index.Clone();
 
+            index.SetContent("content_A_v2");
+
+            Assert.AreEqual("content_A_v1", olderIndex.GetContent());
+            Assert.AreEqual("content_A_v2", index.GetContent());
+
+            olderIndex.Replace(index);
+
+            Assert.IsFalse(index.IsValid());
+            Assert.AreEqual("content_A_v2", olderIndex.GetContent());
+        }
+
+        [TestMethod]
+        public void GraphCompact_RemovesScene_WhenNoLongerAccessible()
+        {
+            var builder = Graph<string, string>.NewBuilder();
+            builder.Add("A", "content_A", "shared_content_A");
+            builder.Add("B", "content_B", "shared_content_B");
+
+            var graph = builder.Build();
+
+            var index = graph.CreateIndex("A");
+            index.SetContent("content_A_v1");
+            index.Go("B");
+            index.SetContent("content_B_v1");
+            index.Go("A");
+
+            var olderIndex = index.Clone();
+
+            index.SetContent("content_A_v2");
+
+            olderIndex.Release();
+
+            Assert.AreEqual(3, graph.versions.Count);
+            Assert.AreEqual(3, graph.GetStage("A").scenes.Count);
+
+            index.Go("A");
+            Assert.AreEqual("content_A_v2", index.GetContent());
+            index.Go("B");
+            Assert.AreEqual("content_B_v1", index.GetContent());
+
+            graph.Compact();
+
+            Assert.AreEqual(3, graph.versions.Count);
+            Assert.AreEqual(2, graph.GetStage("A").scenes.Count);
+
+            index.Go("A");
+            Assert.AreEqual("content_A_v2", index.GetContent());
+            index.Go("B");
+            Assert.AreEqual("content_B_v1", index.GetContent());
+        }
+
+        // Test compact removes an orphaned version
+
+        // Test 3 complex index and compact scenarios
 
         private static Graph<string, string> CreateTestGraph()
         {

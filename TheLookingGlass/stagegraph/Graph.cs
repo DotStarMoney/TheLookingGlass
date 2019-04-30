@@ -32,10 +32,11 @@ namespace TheLookingGlass.StageGraph
                 new List<Version<ContentType, SharedContentType>>();
             foreach (var scene in orphanedScenes)
             {
+                var sceneVersion = scene.Version;
                 PurgeScene(scene);
-                if (!scene.Version.InStages.Any())
+                if (!sceneVersion.InStages.Any())
                 {
-                    emptyVersions.Add(scene.Version);
+                    emptyVersions.Add(sceneVersion);
                 }
             }
 
@@ -76,7 +77,7 @@ namespace TheLookingGlass.StageGraph
                 exploreVersions.Push(new CompactStageMask(version, GetAllStages()));
             }
 
-            var orphanedScenes = GetAllScenes();
+            var orphanedScenes = GetNonRootScenes();
             while(exploreVersions.Any())
             {
                 var exploreVersion = exploreVersions.Pop();
@@ -84,7 +85,7 @@ namespace TheLookingGlass.StageGraph
                 int deadScenesLength = orphanedScenes.Count;
                 ForEachSceneAtVersion(exploreVersion.Version, scene =>
                 {
-                    if (orphanedScenes.Remove(scene))
+                    if (exploreVersion.Mask.Contains(scene.Stage) && orphanedScenes.Remove(scene))
                     {
                         scene.ForEachDescendant((descendant, _) =>
                         {
@@ -98,30 +99,34 @@ namespace TheLookingGlass.StageGraph
                 mask.ExceptWith(exploreVersion.Version.InStages);
 
                 bool reassignedBase = false;
-                for (
-                    var version = exploreVersion.Version; 
-                    version != RootVersion; 
-                    version = version.BaseVersion)
+                if (mask.Any())
                 {
-                    if (version.ReferencedByIndex())
+                    for (
+                        var version = exploreVersion.Version.BaseVersion;
+                        version != RootVersion;
+                        version = version.BaseVersion)
                     {
-                        exploreVersions.Push(new CompactStageMask(version, GetAllStages()));
-                        ReassignVersionBase(exploreVersion.Version, version);
-                        reassignedBase = true;
-                        break;
-                    }
-
-                    foreach (var stage in version.InStages)
-                    {
-                        if (mask.Contains(stage))
+                        if (version.ReferencedByIndex())
                         {
-                            exploreVersions.Push(new CompactStageMask(
-                                version, 
-                                new HashSet<Stage<ContentType, SharedContentType>>(mask)));
+                            exploreVersions.Push(new CompactStageMask(version, GetAllStages()));
                             ReassignVersionBase(exploreVersion.Version, version);
                             reassignedBase = true;
                             break;
                         }
+
+                        foreach (var stage in version.InStages)
+                        {
+                            if (mask.Contains(stage))
+                            {
+                                exploreVersions.Push(new CompactStageMask(
+                                    version,
+                                    new HashSet<Stage<ContentType, SharedContentType>>(mask)));
+                                ReassignVersionBase(exploreVersion.Version, version);
+                                reassignedBase = true;
+                                break;
+                            }
+                        }
+                        if (reassignedBase) break;
                     }
                 }
                 if (!reassignedBase) ReassignVersionBase(exploreVersion.Version, RootVersion);
@@ -150,10 +155,17 @@ namespace TheLookingGlass.StageGraph
             return new HashSet<Stage<ContentType, SharedContentType>>(stages.Values);
         }
 
-        private HashSet<Scene<ContentType, SharedContentType>> GetAllScenes()
+        private HashSet<Scene<ContentType, SharedContentType>> GetNonRootScenes()
         {
             var allScenes = new HashSet<Scene<ContentType, SharedContentType>>();
-            foreach (var stageEntry in stages) stageEntry.Value.ForEachScene(scene => allScenes.Add(scene));
+            foreach (var stageEntry in stages)
+            {
+                stageEntry.Value.ForEachScene(scene =>
+                {
+                    if (scene.Version == RootVersion) return;
+                    allScenes.Add(scene);
+                });
+            }
             return allScenes;
         }
 

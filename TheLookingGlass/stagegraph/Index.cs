@@ -190,10 +190,8 @@ namespace TheLookingGlass.StageGraph
         public void Release()
         {
             if (!IsValid()) return;
-            CheckValid();
-            Invalidate();
-
             version.DecIndexRefs();
+            Invalidate();
         }
 
         public bool IsValid() => graph != null;
