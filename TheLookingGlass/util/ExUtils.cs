@@ -2,7 +2,7 @@
 
 namespace TheLookingGlass
 {
-    public class ExUtils
+    public static class ExUtils
     {
         public static InvalidOperationException RuntimeException(in string exceptionString, 
             params object[] args)

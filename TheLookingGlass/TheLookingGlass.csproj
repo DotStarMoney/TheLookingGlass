@@ -43,7 +43,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="ClaimCheck.cs" />
-    <Compile Include="ExUtils.cs" />
+    <Compile Include="util\Collections.cs" />
+    <Compile Include="util\ExUtils.cs" />
     <Compile Include="Game1.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

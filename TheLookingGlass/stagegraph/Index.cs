@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 
+// Make unembed a set content action
+
 namespace TheLookingGlass.StageGraph
 {
     public class Index<ContentType, SharedContentType>
@@ -80,7 +82,8 @@ namespace TheLookingGlass.StageGraph
                 graph.versions.Add(updatedVersion);
                 updatedVersion.AddStage(stage);
 
-                if (graph.frontier.Remove(version)) graph.frontier.Add(updatedVersion);
+                _ = graph.frontier.Remove(version);
+                graph.frontier.Add(updatedVersion);
             }
             else
             {
@@ -115,7 +118,7 @@ namespace TheLookingGlass.StageGraph
             version = updatedVersion;
         }
 
-        private static IEnumerable<EmbedToken> EmbedInDescendants(
+        private IEnumerable<EmbedToken> EmbedInDescendants(
             in Version<ContentType, SharedContentType> fromVersion,
             in Scene<ContentType, SharedContentType> fromScene,
             in IEnumerable<Index<ContentType, SharedContentType>> toEmbed)
@@ -130,6 +133,7 @@ namespace TheLookingGlass.StageGraph
                 fromVersion.IncLinksToEmbeddedVersion(embedVersion);
                 tokens.Add(fromScene.AddDescendant(embedIndex.stage.GetScene(embedVersion), embedVersion));
 
+                _ = graph.frontier.Remove(embedVersion);
                 embedIndex.Invalidate();
             }
             return tokens;
@@ -149,6 +153,8 @@ namespace TheLookingGlass.StageGraph
 
             descendant.ObservedAt.IncIndexRefs();
             descendant.ObservedAt.DecParentN();
+            if (descendant.ObservedAt.HasNoParents()) graph.frontier.Add(descendant.ObservedAt);
+            
             version.DecLinksToEmbeddedVersion(descendant.ObservedAt);
 
             return new Index<ContentType, SharedContentType>(
