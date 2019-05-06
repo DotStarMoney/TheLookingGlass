@@ -6,6 +6,8 @@ namespace TheLookingGlass.StageGraph
 {
     public sealed class Graph<ContentType, SharedContentType>
     {
+        private readonly bool aggressiveCompaction;
+
         internal Dictionary<string, Stage<ContentType, SharedContentType>> stages =
             new Dictionary<string, Stage<ContentType, SharedContentType>>();
 
@@ -25,7 +27,6 @@ namespace TheLookingGlass.StageGraph
 
         public void Compact()
         {
-            PurgeVersions(GetOrphanedVersions());
             var orphanedScenes = IsolateOrphanedScenes();
 
             List<Version<ContentType, SharedContentType>> emptyVersions =
@@ -54,9 +55,8 @@ namespace TheLookingGlass.StageGraph
         private void PurgeScene(in Scene<ContentType, SharedContentType> scene)
         {
             var sceneVersion = scene.Version;
-            scene.ForEachDescendant((descendantScene, _) =>
+            scene.ForEachDescendant((_, descendantVersion) =>
             {
-                var descendantVersion = descendantScene.Version;
                 sceneVersion.DecLinksToEmbeddedVersion(descendantVersion);
                 descendantVersion.DecParentN();
             });
@@ -68,13 +68,12 @@ namespace TheLookingGlass.StageGraph
         private HashSet<Scene<ContentType, SharedContentType>> IsolateOrphanedScenes()
         {
             var exploreVersions = new Stack<CompactStageMask>();
-            foreach(var version in frontier)
+            foreach(var version in versions)
             {
-                if (!version.ReferencedByIndex())
+                if (version.ReferencedByIndex())
                 {
-                    throw ExUtils.RuntimeException("Cannot purge dead scenes while orphaned versions exist.");
+                    exploreVersions.Push(new CompactStageMask(version, GetAllStages()));
                 }
-                exploreVersions.Push(new CompactStageMask(version, GetAllStages()));
             }
 
             var orphanedScenes = GetNonRootScenes();
@@ -106,14 +105,6 @@ namespace TheLookingGlass.StageGraph
                         version != RootVersion;
                         version = version.BaseVersion)
                     {
-                        if (version.ReferencedByIndex())
-                        {
-                            exploreVersions.Push(new CompactStageMask(version, GetAllStages()));
-                            ReassignVersionBase(exploreVersion.Version, version);
-                            reassignedBase = true;
-                            break;
-                        }
-
                         foreach (var stage in version.InStages)
                         {
                             if (mask.Contains(stage))
@@ -169,62 +160,6 @@ namespace TheLookingGlass.StageGraph
             return allScenes;
         }
 
-        private void PurgeVersions(HashSet<Version<ContentType, SharedContentType>> versionsToPurge)
-        {
-            foreach (var version in versionsToPurge)
-            {
-                _ = frontier.Remove(version);
-
-                version.ForEachUniqueNonRootLink(linkedVersion =>
-                {
-                    if (!versions.Contains(linkedVersion)) return;
-
-                    linkedVersion.DecParentN();
-                    if (linkedVersion.HasNoParents() && !versionsToPurge.Contains(linkedVersion))
-                    {
-                        frontier.Add(linkedVersion);
-                    }
-                });
-
-                foreach (var stage in version.InStages)
-                {
-                    stage.RemoveScene(version);
-                }
-                versions.Remove(version);
-            }
-        }
-
-        private HashSet<Version<ContentType, SharedContentType>> GetOrphanedVersions()
-        {
-            var orphanedVersions = new HashSet<Version<ContentType, SharedContentType>>(versions);
-            orphanedVersions.Remove(RootVersion);
-
-            Stack<CompactBranch> branchesToPersue = new Stack<CompactBranch>();
-            foreach (var version in frontier)
-            {
-                if (!orphanedVersions.Any()) break;
-
-                branchesToPersue.Push(new CompactBranch(version, version.ReferencedByIndex()));
-                while (branchesToPersue.Any())
-                {
-                    var currentVersion = branchesToPersue.Last().Version;
-                    var accessible = branchesToPersue.Last().Accessible || currentVersion.ReferencedByIndex();
-                    _ = branchesToPersue.Pop();
-
-                    currentVersion.ForEachUniqueNonRootLink(linkedVersion =>
-                    {
-                        if (orphanedVersions.Contains(linkedVersion))
-                        {
-                            branchesToPersue.Push(new CompactBranch(linkedVersion, accessible));
-                        }
-                    });
-
-                    if (accessible) orphanedVersions.Remove(currentVersion);
-                }
-            }
-            return orphanedVersions;
-        }
-
         private sealed class CompactBranch
         {
             internal Version<ContentType, SharedContentType> Version { get; }
@@ -270,6 +205,8 @@ namespace TheLookingGlass.StageGraph
 
             internal List<StageFragment> Fragments { get { return fragments; } }
 
+            internal bool aggressiveCompaction = false;
+
             internal Builder() { }
 
             public Builder Add(in string name, in ContentType content, in SharedContentType sharedContent)
@@ -278,9 +215,16 @@ namespace TheLookingGlass.StageGraph
                 return this;
             }
 
+            public Builder SetAggressiveCompaction(in bool aggressiveCompaction)
+            {
+                this.aggressiveCompaction = aggressiveCompaction;
+                return this;
+            }
+
             public void Clear()
             {
                 fragments.Clear();
+                aggressiveCompaction = false;
             }
 
             public Graph<ContentType, SharedContentType> Build()
@@ -306,6 +250,11 @@ namespace TheLookingGlass.StageGraph
             }
         }
 
+        internal void maybeCompact()
+        {
+            if (aggressiveCompaction) Compact();
+        }
+
         private Graph(in Builder builder)
         {
             this.RootVersion = new Version<ContentType, SharedContentType>();
@@ -322,6 +271,8 @@ namespace TheLookingGlass.StageGraph
                 this.stages.Add(fragment.Name, stage);
                 this.RootVersion.AddStage(stage);
             }
+
+            this.aggressiveCompaction = builder.aggressiveCompaction;
         }
     }
 }

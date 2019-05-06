@@ -69,6 +69,32 @@ namespace TheLookingGlass.StageGraph
             in IEnumerable<Index<ContentType, SharedContentType>> toEmbed,
             in bool linkBase = false)
         {
+            SetContent(contentProvider, toEmbed, Enumerable.Empty<EmbedToken>(), linkBase);
+        }
+
+        public void SetContent(
+            ContentType content,
+            in IEnumerable<EmbedToken> toUnembed,
+            in bool linkBase = false)
+        {
+            SetContent(
+                _ => content, 
+                Enumerable.Empty<Index<ContentType, SharedContentType>>(), 
+                toUnembed, 
+                linkBase);
+        }
+
+        public void SetContent(ContentType content, in bool linkBase = false)
+        {
+            SetContent(_ => content, Enumerable.Empty<Index<ContentType, SharedContentType>>(), linkBase);
+        }
+
+        public void SetContent(
+            in Func<IEnumerable<EmbedToken>, ContentType> contentProvider,
+            in IEnumerable<Index<ContentType, SharedContentType>> toEmbed,
+            in IEnumerable<EmbedToken> toUnembed,
+            in bool linkBase = false)
+        {
             CheckValid();
             var scene = stage.GetScene(version);
 
@@ -95,7 +121,8 @@ namespace TheLookingGlass.StageGraph
                         dummyScene.Content = scene.Content;
                         scene.basis = dummyScene;
                     }
-                    scene.Content = contentProvider(EmbedInDescendants(version, scene, toEmbed));
+                    Unembed(scene, toUnembed);
+                    scene.Content = contentProvider(Embed(version, scene, toEmbed));
                     return;
                 }
                 updatedVersion.AddStage(stage);
@@ -112,13 +139,30 @@ namespace TheLookingGlass.StageGraph
                 observedAt.IncParentN();
                 updatedVersion.IncLinksToEmbeddedVersion(observedAt);
             });
-            newScene.Content = contentProvider(EmbedInDescendants(updatedVersion, newScene, toEmbed));
+            Unembed(newScene, toUnembed);
+            newScene.Content = contentProvider(Embed(updatedVersion, newScene, toEmbed));
 
             stage.AddScene(newScene);
             version = updatedVersion;
         }
 
-        private IEnumerable<EmbedToken> EmbedInDescendants(
+        private void Unembed(
+            in Scene<ContentType, SharedContentType> fromScene,
+            in IEnumerable<EmbedToken> toUnembed)
+        {
+            foreach (var token in toUnembed)
+            {
+                var descendant = fromScene.GetDescendant(token);
+
+                descendant.ObservedAt.DecParentN();
+                if (descendant.ObservedAt.HasNoParents()) graph.frontier.Add(descendant.ObservedAt);
+
+                fromScene.RemoveDescendant(token);
+                fromScene.Version.DecLinksToEmbeddedVersion(descendant.ObservedAt);
+            }
+        }
+
+        private IEnumerable<EmbedToken> Embed(
             in Version<ContentType, SharedContentType> fromVersion,
             in Scene<ContentType, SharedContentType> fromScene,
             in IEnumerable<Index<ContentType, SharedContentType>> toEmbed)
@@ -137,30 +181,6 @@ namespace TheLookingGlass.StageGraph
                 embedIndex.Invalidate();
             }
             return tokens;
-        }
-
-        public void SetContent(ContentType content, in bool linkBase = false)
-        {
-            SetContent(_ => content, Enumerable.Empty<Index<ContentType, SharedContentType>>(), linkBase);
-        }
-
-        public Index<ContentType, SharedContentType> Unembed(in EmbedToken token)
-        {
-            CheckValid();
-            var scene = stage.GetScene(version);
-
-            var descendant = scene.RemoveDescendant(token);
-
-            descendant.ObservedAt.IncIndexRefs();
-            descendant.ObservedAt.DecParentN();
-            if (descendant.ObservedAt.HasNoParents()) graph.frontier.Add(descendant.ObservedAt);
-            
-            version.DecLinksToEmbeddedVersion(descendant.ObservedAt);
-
-            return new Index<ContentType, SharedContentType>(
-                graph,
-                descendant.ObservedAt,
-                descendant.Target.Stage);
         }
 
         public Index<ContentType, SharedContentType> IndexFromEmbedded(in EmbedToken token)
@@ -191,12 +211,16 @@ namespace TheLookingGlass.StageGraph
             version = index.version;
             stage = index.stage;
             index.Invalidate();
+
+            graph.maybeCompact();
         }
 
         public void Release()
         {
             if (!IsValid()) return;
             version.DecIndexRefs();
+
+            graph.maybeCompact();
             Invalidate();
         }
 

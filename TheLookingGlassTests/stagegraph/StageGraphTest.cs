@@ -194,7 +194,7 @@ namespace TheLookingGlassTests
         }
 
         [TestMethod]
-        public void IndexUnembed_ReconstructsIndexAndRemovesEmbed_WhenUnembedded()
+        public void IndexSetContent_RemovesEmbedFromSameVersion_WhenGivenEmbedToken()
         {
             var graph = Graph<EmbedToken, string>.NewBuilder()
                 .Add("A", new EmbedToken(-1), "shared_content_A")
@@ -203,27 +203,49 @@ namespace TheLookingGlassTests
             var index = graph.CreateIndex("A");
             Assert.AreEqual(-1, index.GetContent().LookupId);
 
-            var embedMeIndex = index.Clone();
-            int tokenId = -1;
             index.SetContent(
-                tokens =>
-                {
-                    EmbedToken token = Collections.GetOnlyElement(tokens);
-                    tokenId = token.LookupId;
-                    return token;
-                },
-                Collections.Of(embedMeIndex));
+                tokens => Collections.GetOnlyElement(tokens), 
+                Collections.Of(index.Clone()));
 
-            Assert.IsFalse(embedMeIndex.IsValid());
-            Assert.AreEqual(1, index.stage.GetScene(index.version).descendants.Count);
+            index.SetContent(
+                tokens => Collections.GetOnlyElement(tokens),
+                Collections.Of(index.Clone()));
 
-            Assert.AreEqual(tokenId, index.GetContent().LookupId);
+            EmbedToken token = index.GetContent();
 
-            var rescuedIndex = index.Unembed(index.GetContent());
-            Assert.AreEqual(-1, rescuedIndex.GetContent().LookupId);
+            index.SetContent(new EmbedToken(-1), Collections.Of(token));
 
-            Assert.AreEqual(0, index.stage.GetScene(index.version).descendants.Count);
-            Assert.AreEqual(0, rescuedIndex.stage.GetScene(rescuedIndex.version).descendants.Count);
+            Assert.ThrowsException<InvalidOperationException>(
+                () => index.SetContent(new EmbedToken(-1), Collections.Of(token)),
+                String.Format("No element at Id={0} exists.", token.LookupId));
+        }
+        [TestMethod]
+        public void IndexSetContent_RemovesEmbedFromNewVersion_WhenGivenEmbedToken()
+        {
+            var graph = Graph<EmbedToken, string>.NewBuilder()
+                .Add("A", new EmbedToken(-1), "shared_content_A")
+                .Build();
+
+            var index = graph.CreateIndex("A");
+            Assert.AreEqual(-1, index.GetContent().LookupId);
+
+            index.SetContent(
+                tokens => Collections.GetOnlyElement(tokens),
+                Collections.Of(index.Clone()));
+
+            index.SetContent(
+                tokens => Collections.GetOnlyElement(tokens),
+                Collections.Of(index.Clone()));
+
+            EmbedToken token = index.GetContent();
+
+            var tempIndex = index.Clone();
+            index.SetContent(new EmbedToken(-1), Collections.Of(token));
+            tempIndex.Release();
+
+            Assert.ThrowsException<InvalidOperationException>(
+                () => index.SetContent(new EmbedToken(-1), Collections.Of(token)),
+                String.Format("No element at Id={0} exists.", token.LookupId));
         }
 
         [TestMethod]
@@ -383,9 +405,58 @@ namespace TheLookingGlassTests
         }
 
         [TestMethod]
-        public void GraphCompact_RemovesScenesAndVersions_WhenGraphHasBothOrphanedScenesAndVersions()
+        public void GraphCompact_RetainsBaseUnreachableScene_IfReachedByEmbed()
         {
             var builder = Graph<TestContent, string>.NewBuilder();
+            builder.Add("A", "content_A", "shared_content_A");
+
+            var graph = builder.Build();
+
+            var tempIndex = graph.CreateIndex("A");
+            tempIndex.SetContent("content_A_v1");
+
+            var index = graph.CreateIndex("A");
+            index.SetContent(
+                tokens => new TestContent("content_A_v2", Collections.GetOnlyElement(tokens)),
+                Collections.Of(tempIndex));
+
+            Assert.AreEqual(3, graph.versions.Count);
+
+            graph.Compact();
+
+            Assert.AreEqual(3, graph.versions.Count);
+        }
+
+        [TestMethod]
+        public void GraphCompact_RemovesScenesAndVersions_WhenGraphHasBothOrphanedScenesAndVersions()
+        {
+            var graph = createOrphanedSceneAndVersionGraphBuilder(Graph<TestContent, string>.NewBuilder());
+
+            Assert.AreEqual(9, graph.versions.Count);
+            Assert.AreEqual(6, graph.stages["A"].scenes.Count);
+            Assert.AreEqual(8, graph.stages["B"].scenes.Count);
+
+            graph.Compact();
+
+            Assert.AreEqual(5, graph.versions.Count);
+            Assert.AreEqual(4, graph.stages["A"].scenes.Count);
+            Assert.AreEqual(4, graph.stages["B"].scenes.Count);
+        }
+
+        [TestMethod]
+        public void GraphAggressiveCompaction_IsEquivalentToManualCompact_WhenGraphHasBothOrphanedScenesAndVersions()
+        {
+            var graph = createOrphanedSceneAndVersionGraphBuilder(
+                Graph<TestContent, string>.NewBuilder().SetAggressiveCompaction(true));
+
+            Assert.AreEqual(5, graph.versions.Count);
+            Assert.AreEqual(4, graph.stages["A"].scenes.Count);
+            Assert.AreEqual(4, graph.stages["B"].scenes.Count);
+        }
+
+        private static Graph<TestContent, string> createOrphanedSceneAndVersionGraphBuilder(
+            in Graph<TestContent, string>.Builder builder)
+        {
             builder.Add("A", "content_A", "shared_content_A");
             builder.Add("B", "content_B", "shared_content_B");
 
@@ -407,52 +478,47 @@ namespace TheLookingGlassTests
             tempIndexRight.SetContent("content_B_v5");
             tempIndexRight.Release();
 
-            var middleIndex = graph.CreateIndex("A");
+            var middleIndex = graph.CreateIndex("B");
+
+            var persistantLeftIndex = leftIndex.Clone();
+            EmbedToken token = default;
             middleIndex.SetContent(
-                tokens => new TestContent("content_A_v3", Collections.GetOnlyElement(tokens)),
+                tokens => {
+                    token = Collections.GetOnlyElement(tokens);
+                    return new TestContent("content_B_v3", token);
+                },
                 Collections.Of(leftIndex));
-            middleIndex.Go("B");
-            middleIndex.SetContent("content_B_v3");
+            middleIndex.Go("A");
+            middleIndex.SetContent("content_A_v3");
 
             var tempIndex1 = middleIndex.Clone();
 
             middleIndex.Go("B");
             middleIndex.SetContent(
-                tokens => new TestContent("content_B_v4", Collections.GetOnlyElement(tokens)),
-                Collections.Of(rightIndex));
-
-            middleIndex.Go("A");
-            middleIndex.Unembed(middleIndex.GetContent().Token).Release();
+                tokens => {
+                    token = Collections.GetOnlyElement(tokens);
+                    return new TestContent("content_B_v4", token);
+                },
+                Collections.Of(rightIndex),
+                Collections.Of(token));
 
             tempIndex1.Release();
 
-            middleIndex.Go("B");
             var leftFork = middleIndex.Clone();
-            leftFork.Unembed(leftFork.GetContent().Token);
-            var rightFork = middleIndex.Clone();
-            rightFork.Unembed(rightFork.GetContent().Token);
-
-            middleIndex.Release();
-
-            leftFork.SetContent("content_B_v6");
+            leftFork.SetContent("content_B_v6", Collections.Of(leftFork.GetContent().Token));
             leftFork.Go("A");
             leftFork.SetContent("content_A_v6");
 
-            rightFork.SetContent("content_B_v7");
+            var rightFork = middleIndex.Clone();
+            rightFork.SetContent("content_B_v7", Collections.Of(rightFork.GetContent().Token));
+
+            middleIndex.Release();
 
             var tempIndexLeftFork = leftFork.Clone();
             tempIndexLeftFork.SetContent("content_A_v8");
             tempIndexLeftFork.Release();
 
-            Assert.AreEqual(9, graph.versions.Count);
-            Assert.AreEqual(6, graph.stages["A"].scenes.Count);
-            Assert.AreEqual(8, graph.stages["B"].scenes.Count);
-
-            graph.Compact();
-
-            Assert.AreEqual(5, graph.versions.Count);
-            //Assert.AreEqual(6, graph.stages["A"].scenes.Count);
-            //Assert.AreEqual(8, graph.stages["B"].scenes.Count);
+            return graph;
         }
 
         private sealed class TestContent
