@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 
-// Make unembed a set content action
-
 namespace TheLookingGlass.StageGraph
 {
     public class Index<ContentType, SharedContentType>
