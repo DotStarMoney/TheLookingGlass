@@ -1,0 +1,34 @@
+﻿#ifndef CLASSIC_SHADER_HLSL
+#define CLASSIC_SHADER_HLSL
+
+#include "shader_version.hfx"
+
+matrix WorldViewProjection;
+
+struct VertexShaderInput
+{
+	float4 Position : POSITION0;
+	float4 Color : COLOR0;
+};
+
+struct VertexShaderOutput
+{
+	float4 Position : SV_POSITION;
+	float4 Color : COLOR0;
+};
+
+VertexShaderOutput MainVS(in VertexShaderInput input)
+{
+	VertexShaderOutput output = (VertexShaderOutput)0;
+
+	output.Position = mul(input.Position, WorldViewProjection);
+	output.Color = float4(7, 7, 7, 7); // input.Color;
+
+	return output;
+}
+
+float4 MainPS(VertexShaderOutput input) : COLOR
+{
+	return input.Color;
+}
+#endif // CLASSIC_SHADER_HLSL
