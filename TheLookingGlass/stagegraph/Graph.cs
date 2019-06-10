@@ -8,13 +8,12 @@ namespace TheLookingGlass.StageGraph
     {
         private readonly bool aggressiveCompaction;
 
+
         internal Dictionary<string, Stage<ContentType, SharedContentType>> stages =
             new Dictionary<string, Stage<ContentType, SharedContentType>>();
 
-        internal HashSet<Version<ContentType, SharedContentType>> versions =
-            new HashSet<Version<ContentType, SharedContentType>>();
 
-        internal HashSet<Version<ContentType, SharedContentType>> frontier = 
+        internal HashSet<Version<ContentType, SharedContentType>> versions =
             new HashSet<Version<ContentType, SharedContentType>>();
 
         internal Version<ContentType, SharedContentType> RootVersion { get; }
@@ -259,7 +258,6 @@ namespace TheLookingGlass.StageGraph
         {
             this.RootVersion = new Version<ContentType, SharedContentType>();
             this.versions.Add(this.RootVersion);
-            this.frontier.Add(this.RootVersion);
 
             foreach(var fragment in builder.Fragments)
             {

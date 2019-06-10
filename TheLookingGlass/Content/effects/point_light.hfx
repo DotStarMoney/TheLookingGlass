@@ -1,0 +1,19 @@
+#ifndef POINT_LIGHT_HLSL
+#define POINT_LIGHT_HLSL
+
+struct PointLight
+{
+	// Position in world space of the point light.
+	float3 position;
+
+	// Light color. All components must be > 0 (not necessarily < 1).
+	float3 color;
+};
+
+// Get the light color as measured from a point.
+float3 PointLight_GetColor(uniform PointLight light, in float3 position)
+{
+	return light.color / (1.0 + pow(length(position - light.position), 2.0));
+}
+
+#endif // POINT_LIGHT_HLSL

@@ -17,7 +17,6 @@ namespace TheLookingGlassTests
 
             Assert.AreEqual(1, graph.versions.Count);
             Assert.AreEqual(3, graph.stages.Count);
-            Assert.AreEqual(1, graph.frontier.Count);
 
             var stageA = graph.stages["A"];
             Assert.AreEqual(1, stageA.scenes.Count);

@@ -42,7 +42,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="ClaimCheck.cs" />
+    <Compile Include="util\ClaimCheck.cs" />
     <Compile Include="dynamics\Simulation.cs" />
     <Compile Include="util\Collections.cs" />
     <Compile Include="util\ExUtils.cs" />

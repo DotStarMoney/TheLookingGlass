@@ -2,14 +2,14 @@
 #define CLASSIC_SHADER_HLSL
 
 #include "shader_version.hfx"
-#include "point_light.hfx"
-
-#define MAX_POINT_LIGHTS 16
 
 matrix WorldViewProjection;
 
 int POINT_LIGHT_N;
-PointLight POINT_LIGHTS[MAX_POINT_LIGHTS];
+struct PointLight
+{
+	
+};
 
 struct VertexShaderInput
 {
@@ -28,7 +28,7 @@ VertexShaderOutput MainVS(in VertexShaderInput input)
 	VertexShaderOutput output = (VertexShaderOutput)0;
 
 	output.Position = mul(input.Position, WorldViewProjection);
-	output.Color = POINT_LIGHTS[0].color // input.Color;
+	output.Color = input.Color;
 
 	return output;
 }

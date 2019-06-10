@@ -105,9 +105,6 @@ namespace TheLookingGlass.StageGraph
                 updatedVersion = new Version<ContentType, SharedContentType>(version);
                 graph.versions.Add(updatedVersion);
                 updatedVersion.AddStage(stage);
-
-                _ = graph.frontier.Remove(version);
-                graph.frontier.Add(updatedVersion);
             }
             else
             {
@@ -153,7 +150,6 @@ namespace TheLookingGlass.StageGraph
                 var descendant = fromScene.GetDescendant(token);
 
                 descendant.ObservedAt.DecParentN();
-                if (descendant.ObservedAt.HasNoParents()) graph.frontier.Add(descendant.ObservedAt);
 
                 fromScene.RemoveDescendant(token);
                 fromScene.Version.DecLinksToEmbeddedVersion(descendant.ObservedAt);
@@ -175,7 +171,6 @@ namespace TheLookingGlass.StageGraph
                 fromVersion.IncLinksToEmbeddedVersion(embedVersion);
                 tokens.Add(fromScene.AddDescendant(embedIndex.stage.GetScene(embedVersion), embedVersion));
 
-                _ = graph.frontier.Remove(embedVersion);
                 embedIndex.Invalidate();
             }
             return tokens;
