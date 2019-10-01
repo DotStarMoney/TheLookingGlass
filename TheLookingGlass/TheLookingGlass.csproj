@@ -42,6 +42,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="math\ITransformable.cs" />
+    <Compile Include="math\Transform.cs" />
     <Compile Include="util\ClaimCheck.cs" />
     <Compile Include="dynamics\Simulation.cs" />
     <Compile Include="util\Collections.cs" />

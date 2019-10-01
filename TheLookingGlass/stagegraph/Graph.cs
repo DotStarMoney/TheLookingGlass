@@ -159,19 +159,6 @@ namespace TheLookingGlass.StageGraph
             return allScenes;
         }
 
-        private sealed class CompactBranch
-        {
-            internal Version<ContentType, SharedContentType> Version { get; }
-
-            internal bool Accessible { get; }
-
-            internal CompactBranch(in Version<ContentType, SharedContentType> version, in bool accessible)
-            {
-                this.Version = version;
-                this.Accessible = accessible;
-            }
-        }
-
         private sealed class CompactStageMask
         {
             internal Version<ContentType, SharedContentType> Version { get; }
