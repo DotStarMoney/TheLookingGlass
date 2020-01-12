@@ -9,9 +9,7 @@ namespace TheLookingGlass
         private const int DEFAULT_CAPACITY = 16;
 
         private int size = 0;
-
-        private int usedSize = 0;
-
+        
         private int lastValidIndex = 0;
 
         private readonly List<Element> elements;
@@ -21,12 +19,12 @@ namespace TheLookingGlass
         public ClaimCheck(in ClaimCheck<T> other)
         {
             this.size = other.size;
-            this.usedSize = other.usedSize;
+            this.Count = other.Count;
             this.lastValidIndex = other.lastValidIndex;
             this.elements = new List<Element>(other.elements);
         }
 
-        public int Count { get { return usedSize; } }
+        public int Count { get; private set; } = 0;
 
         public int Add(in T x)
         {
@@ -40,7 +38,7 @@ namespace TheLookingGlass
                 newElementIndex = 0;
                 size = 1;
             }
-            else if (usedSize == 0)
+            else if (Count == 0)
             {
                 newElementIndex = lastValidIndex;
             }
@@ -59,7 +57,7 @@ namespace TheLookingGlass
                 newElementIndex = elements[lastValidIndex].nextIndex;
                 lastValidIndex = newElementIndex;
             }
-            usedSize += 1;
+            Count += 1;
             elements[newElementIndex].x = x;
             return newElementIndex;
         }
@@ -73,12 +71,12 @@ namespace TheLookingGlass
         public void Clear()
         {
             int curIndex = lastValidIndex;
-            while (usedSize > 0)
+            while (Count > 0)
             {
                 int nextIndex = elements[curIndex].prevIndex; 
                 elements[curIndex] = new Element(elements[curIndex]);
                 curIndex = nextIndex;
-                --usedSize;
+                --Count;
             }
             lastValidIndex = curIndex;
         }
@@ -107,8 +105,8 @@ namespace TheLookingGlass
                 }
             }
 
-            --usedSize;
-            if (usedSize == 0) return removedElement;
+            --Count;
+            if (Count == 0) return removedElement;
 
             if (id != lastValidIndex)
             {
@@ -138,7 +136,7 @@ namespace TheLookingGlass
 
         public IEnumerator<T> GetEnumerator()
         {
-            if (usedSize > 0)
+            if (Count > 0)
             {
                 int i = lastValidIndex;
                 for (; ;)
