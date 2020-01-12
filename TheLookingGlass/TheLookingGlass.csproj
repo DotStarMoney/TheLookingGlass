@@ -44,6 +44,7 @@
   <ItemGroup>
     <Compile Include="actormodel\Actor.cs" />
     <Compile Include="core\IAdvanceable.cs" />
+    <Compile Include="core\ICloneable.cs" />
     <Compile Include="math\ITransformable.cs" />
     <Compile Include="math\Transform.cs" />
     <Compile Include="util\ClaimCheck.cs" />
