@@ -25,9 +25,13 @@ namespace TheLookingGlass.DeepClone
             if (existingValue != null)
             {
                 if (overwrite)
+                {
                     dict[key] = value;
+                }
                 else
+                {
                     return existingValue;
+                }
             }
             else
             {

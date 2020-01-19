@@ -11,29 +11,29 @@ namespace TheLookingGlass.DeepClone
 
         public Action<object, object> SetMethod { get; set; }
 
-        public bool CanRead { get; private set; }
+        public bool CanRead { get; }
 
-        public bool CanWrite { get; private set; }
+        public bool CanWrite { get; }
 
-        public bool ReadAble { get; private set; }
+        public bool ReadAble { get; }
 
-        public bool FastDeepClonerIgnore { get => ContainAttribute<FastDeepClonerIgnore>(); }
+        public bool FastDeepClonerIgnore => ContainAttribute<FastDeepClonerIgnore>();
 
-        public string Name { get; private set; }
+        public string Name { get; }
 
-        public string FullName { get; private set; }
+        public string FullName { get; }
 
-        public bool IsInternalType { get; private set; }
+        public bool IsInternalType { get;  }
 
         public Type PropertyType { get; set; }
 
-        public bool? IsVirtual { get; private set; }
+        public bool? IsVirtual { get; }
 
-        public AttributesCollections Attributes { get; set; }
+        public IndexedAttributes IndexedAttributes { get; set; }
 
-        public MethodInfo PropertyGetValue { get; private set; }
+        public MethodInfo PropertyGetValue { get; }
 
-        public MethodInfo PropertySetValue { get; private set; }
+        public MethodInfo PropertySetValue { get; }
         internal FastDeepClonerProperty(FieldInfo field)
         {
             CanRead = !(field.IsInitOnly || field.FieldType == typeof(IntPtr) || field.IsLiteral);
@@ -44,7 +44,7 @@ namespace TheLookingGlass.DeepClone
             Name = field.Name;
             FullName = field.FieldType.FullName;
             PropertyType = field.FieldType;
-            Attributes = new AttributesCollections(field.GetCustomAttributes().ToList());
+            IndexedAttributes = new IndexedAttributes(field.GetCustomAttributes().ToList());
             IsInternalType = field.FieldType.IsInternalType();
         }
 
@@ -62,38 +62,13 @@ namespace TheLookingGlass.DeepClone
             PropertyGetValue = property.GetMethod;
             PropertySetValue = property.SetMethod;
             PropertyType = property.PropertyType;
-            Attributes = new AttributesCollections(property.GetCustomAttributes().ToList());
+            IndexedAttributes = new IndexedAttributes(property.GetCustomAttributes().ToList());
 
-        }
-
-        public IEnumerable<T> GetCustomAttributes<T>() where T : Attribute
-        {
-            return ContainAttribute<T>() ? Attributes.OfType<T>() : new List<T>();
-        }
-
-        public IEnumerable<Attribute> GetCustomAttributes(Type type)
-        {
-            return ContainAttribute(type) ? Attributes.Where(x => x.GetType() == type) : new List<Attribute>();
         }
 
         public bool ContainAttribute<T>() where T : Attribute
         {
-            return Attributes?.ContainedAttributestypes.ContainsKey(typeof(T)) ?? false;
-        }
-
-        public T GetCustomAttribute<T>() where T : Attribute
-        {
-            return ContainAttribute<T>() ? (T)Attributes?.ContainedAttributestypes[typeof(T)] : null;
-        }
-
-        public Attribute GetCustomAttribute(Type type)
-        {
-            return ContainAttribute(type) ? Attributes?.ContainedAttributestypes[type] : null;
-        }
-
-        public bool ContainAttribute(Type type)
-        {
-            return Attributes?.ContainedAttributestypes.ContainsKey(type) ?? false;
+            return IndexedAttributes?.Index.ContainsKey(typeof(T)) ?? false;
         }
 
         public void SetValue(object o, object value)
@@ -104,11 +79,6 @@ namespace TheLookingGlass.DeepClone
         public object GetValue(object o)
         {
             return GetMethod(o);
-        }
-
-        public void Add(Attribute attr)
-        {
-            Attributes.Add(attr);
         }
     }
 }

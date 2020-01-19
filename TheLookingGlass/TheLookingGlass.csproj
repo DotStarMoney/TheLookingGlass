@@ -45,7 +45,7 @@
     <Compile Include="actormodel\Actor.cs" />
     <Compile Include="actormodel\ActorBank.cs" />
     <Compile Include="actormodel\ActorManager.cs" />
-    <Compile Include="deepclone\AttributesCollections.cs" />
+    <Compile Include="deepclone\IndexedAttributes.cs" />
     <Compile Include="deepclone\DeepCloner.cs" />
     <Compile Include="deepclone\Extensions.cs" />
     <Compile Include="deepclone\FastDeepClonerCachedItems.cs" />
