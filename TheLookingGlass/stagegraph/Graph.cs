@@ -1,26 +1,46 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TheLookingGlass.Util;
 
 namespace TheLookingGlass.StageGraph
 {
-    public sealed class Graph<ContentType, SharedContentType>
+    public sealed class Graph<TContentType, TSharedContentType>
     {
-        private readonly bool aggressiveCompaction;
+        private readonly bool _aggressiveCompaction;
 
 
-        internal Dictionary<string, Stage<ContentType, SharedContentType>> stages =
-            new Dictionary<string, Stage<ContentType, SharedContentType>>();
+        internal Dictionary<string, Stage<TContentType, TSharedContentType>> Stages =
+            new Dictionary<string, Stage<TContentType, TSharedContentType>>();
 
 
-        internal HashSet<Version<ContentType, SharedContentType>> versions =
-            new HashSet<Version<ContentType, SharedContentType>>();
+        internal HashSet<Version<TContentType, TSharedContentType>> Versions =
+            new HashSet<Version<TContentType, TSharedContentType>>();
 
-        internal Version<ContentType, SharedContentType> RootVersion { get; }
-
-        internal Stage<ContentType, SharedContentType> GetStage(in string name)
+        private Graph(in Builder builder)
         {
-            if (stages.ContainsKey(name)) return stages[name];
+            RootVersion = new Version<TContentType, TSharedContentType>();
+            Versions.Add(RootVersion);
+
+            foreach (var fragment in builder.Fragments)
+            {
+                var stage = new Stage<TContentType, TSharedContentType>(
+                    fragment.Content,
+                    fragment.SharedContent,
+                    fragment.Name,
+                    RootVersion);
+                Stages.Add(fragment.Name, stage);
+                RootVersion.AddStage(stage);
+            }
+
+            _aggressiveCompaction = builder.AggressiveCompaction;
+        }
+
+        internal Version<TContentType, TSharedContentType> RootVersion { get; }
+
+        internal Stage<TContentType, TSharedContentType> GetStage(in string name)
+        {
+            if (Stages.ContainsKey(name)) return Stages[name];
             throw ExUtils.RuntimeException("Stage \"{0}\" not found.", name);
         }
 
@@ -28,30 +48,27 @@ namespace TheLookingGlass.StageGraph
         {
             var orphanedScenes = IsolateOrphanedScenes();
 
-            List<Version<ContentType, SharedContentType>> emptyVersions =
-                new List<Version<ContentType, SharedContentType>>();
+            var emptyVersions =
+                new List<Version<TContentType, TSharedContentType>>();
             foreach (var scene in orphanedScenes)
             {
                 var sceneVersion = scene.Version;
                 PurgeScene(scene);
-                if (!sceneVersion.InStages.Any())
-                {
-                    emptyVersions.Add(sceneVersion);
-                }
+                if (!sceneVersion.InStages.Any()) emptyVersions.Add(sceneVersion);
             }
 
             foreach (var version in emptyVersions)
             {
                 version.ForEachUniqueNonRootLink(linkedVersion =>
                 {
-                    if (!versions.Contains(linkedVersion)) return;
+                    if (!Versions.Contains(linkedVersion)) return;
                     linkedVersion.DecParentN();
                 });
-                versions.Remove(version);
+                Versions.Remove(version);
             }
         }
 
-        private void PurgeScene(in Scene<ContentType, SharedContentType> scene)
+        private static void PurgeScene(in Scene<TContentType, TSharedContentType> scene)
         {
             var sceneVersion = scene.Version;
             scene.ForEachDescendant((_, descendantVersion) =>
@@ -64,10 +81,10 @@ namespace TheLookingGlass.StageGraph
             scene.ClearForGc();
         }
 
-        private HashSet<Scene<ContentType, SharedContentType>> IsolateOrphanedScenes()
+        private IEnumerable<Scene<TContentType, TSharedContentType>> IsolateOrphanedScenes()
         {
             var exploreVersions = new Stack<CompactStageMask>();
-            foreach(var version in versions)
+            foreach (var version in Versions)
             {
                 if (version.ReferencedByIndex())
                 {
@@ -76,29 +93,27 @@ namespace TheLookingGlass.StageGraph
             }
 
             var orphanedScenes = GetNonRootScenes();
-            while(exploreVersions.Any())
+            while (exploreVersions.Any())
             {
                 var exploreVersion = exploreVersions.Pop();
 
-                int deadScenesLength = orphanedScenes.Count;
+                var deadScenesLength = orphanedScenes.Count;
                 ForEachSceneAtVersion(exploreVersion.Version, scene =>
                 {
                     if (exploreVersion.Mask.Contains(scene.Stage) && orphanedScenes.Remove(scene))
-                    {
                         scene.ForEachDescendant((descendant, _) =>
                         {
-                            exploreVersions.Push(new CompactStageMask(descendant.Version, GetAllStages()));
+                            exploreVersions.Push(
+                                new CompactStageMask(descendant.Version, GetAllStages()));
                         });
-                    }
                 });
                 if (deadScenesLength == orphanedScenes.Count) continue;
 
                 var mask = exploreVersion.Mask;
                 mask.ExceptWith(exploreVersion.Version.InStages);
 
-                bool reassignedBase = false;
+                var reassignedBase = false;
                 if (mask.Any())
-                {
                     for (
                         var version = exploreVersion.Version.BaseVersion;
                         version != RootVersion;
@@ -106,49 +121,49 @@ namespace TheLookingGlass.StageGraph
                     {
                         foreach (var stage in version.InStages)
                         {
-                            if (mask.Contains(stage))
-                            {
-                                exploreVersions.Push(new CompactStageMask(
-                                    version,
-                                    new HashSet<Stage<ContentType, SharedContentType>>(mask)));
-                                ReassignVersionBase(exploreVersion.Version, version);
-                                reassignedBase = true;
-                                break;
-                            }
+                            if (!mask.Contains(stage)) continue;
+                            exploreVersions.Push(new CompactStageMask(
+                                version,
+                                new HashSet<Stage<TContentType, TSharedContentType>>(mask)));
+                            ReassignVersionBase(exploreVersion.Version, version);
+                            reassignedBase = true;
+                            break;
                         }
+
                         if (reassignedBase) break;
                     }
-                }
+
                 if (!reassignedBase) ReassignVersionBase(exploreVersion.Version, RootVersion);
             }
+
             return orphanedScenes;
         }
 
         private static void ReassignVersionBase(
-            in Version<ContentType, SharedContentType> source,
-            in Version<ContentType, SharedContentType> newBase)
+            in Version<TContentType, TSharedContentType> source,
+            in Version<TContentType, TSharedContentType> newBase)
         {
             source.BaseVersion.DecParentN();
             source.BaseVersion = newBase;
             newBase.IncParentN();
         }
 
-        private void ForEachSceneAtVersion(
-            in Version<ContentType, SharedContentType> version, 
-            in Action<Scene<ContentType, SharedContentType>> fn)
+        private static void ForEachSceneAtVersion(
+            in Version<TContentType, TSharedContentType> version,
+            in Action<Scene<TContentType, TSharedContentType>> fn)
         {
-            foreach(var stage in version.InStages) fn(stage.GetScene(version));
+            foreach (var stage in version.InStages) fn(stage.GetScene(version));
         }
 
-        private HashSet<Stage<ContentType, SharedContentType>> GetAllStages()
+        private HashSet<Stage<TContentType, TSharedContentType>> GetAllStages()
         {
-            return new HashSet<Stage<ContentType, SharedContentType>>(stages.Values);
+            return new HashSet<Stage<TContentType, TSharedContentType>>(Stages.Values);
         }
 
-        private HashSet<Scene<ContentType, SharedContentType>> GetNonRootScenes()
+        private HashSet<Scene<TContentType, TSharedContentType>> GetNonRootScenes()
         {
-            var allScenes = new HashSet<Scene<ContentType, SharedContentType>>();
-            foreach (var stageEntry in stages)
+            var allScenes = new HashSet<Scene<TContentType, TSharedContentType>>();
+            foreach (var stageEntry in Stages)
             {
                 stageEntry.Value.ForEachScene(scene =>
                 {
@@ -156,108 +171,90 @@ namespace TheLookingGlass.StageGraph
                     allScenes.Add(scene);
                 });
             }
+
             return allScenes;
+        }
+
+        public Index<TContentType, TSharedContentType> CreateIndex(in string stageName)
+        {
+            lock (RootVersion)
+            {
+                RootVersion.IncIndexRefs();
+            }
+
+            return new Index<TContentType, TSharedContentType>(this, RootVersion, GetStage(stageName));
+        }
+
+        public static Builder NewBuilder()
+        {
+            return new Builder();
+        }
+
+        internal void MaybeCompact()
+        {
+            if (_aggressiveCompaction) Compact();
         }
 
         private sealed class CompactStageMask
         {
-            internal Version<ContentType, SharedContentType> Version { get; }
-
-            internal HashSet<Stage<ContentType, SharedContentType>> Mask { get; }
-            
             internal CompactStageMask(
-                in Version<ContentType, SharedContentType> version, 
-                in HashSet<Stage<ContentType, SharedContentType>> mask)
+                in Version<TContentType, TSharedContentType> version,
+                in HashSet<Stage<TContentType, TSharedContentType>> mask)
             {
-                this.Version = version;
-                this.Mask = mask;
+                Version = version;
+                Mask = mask;
             }
-        }
 
-        public Index<ContentType, SharedContentType> CreateIndex(in string stageName)
-        {
-            lock(RootVersion)
-            {
-                RootVersion.IncIndexRefs();
-            }
-            return new Index<ContentType, SharedContentType>(this, RootVersion, GetStage(stageName));
-        }
+            internal Version<TContentType, TSharedContentType> Version { get; }
 
-        public static Builder NewBuilder() => new Builder();
+            internal HashSet<Stage<TContentType, TSharedContentType>> Mask { get; }
+        }
 
         public sealed class Builder
         {
-            private List<StageFragment> fragments = new List<StageFragment>();
+            internal bool AggressiveCompaction;
 
-            internal List<StageFragment> Fragments { get { return fragments; } }
+            internal List<StageFragment> Fragments { get; } = new List<StageFragment>();
 
-            internal bool aggressiveCompaction = false;
-
-            internal Builder() { }
-
-            public Builder Add(in string name, in ContentType content, in SharedContentType sharedContent)
+            public Builder Add(in string name, in TContentType content, in TSharedContentType sharedContent)
             {
-                fragments.Add(new StageFragment(name, content, sharedContent));
+                Fragments.Add(new StageFragment(name, content, sharedContent));
                 return this;
             }
 
             public Builder SetAggressiveCompaction(in bool aggressiveCompaction)
             {
-                this.aggressiveCompaction = aggressiveCompaction;
+                AggressiveCompaction = aggressiveCompaction;
                 return this;
             }
 
             public void Clear()
             {
-                fragments.Clear();
-                aggressiveCompaction = false;
+                Fragments.Clear();
+                AggressiveCompaction = false;
             }
 
-            public Graph<ContentType, SharedContentType> Build()
+            public Graph<TContentType, TSharedContentType> Build()
             {
-                return new Graph<ContentType, SharedContentType>(this);
+                return new Graph<TContentType, TSharedContentType>(this);
             }
 
             internal sealed class StageFragment
             {
-                internal string Name { get; }
-                
-                internal ContentType Content { get; }
-
-                internal SharedContentType SharedContent { get; }
-
-                internal StageFragment(in string name, in ContentType content, 
-                    in SharedContentType sharedContent)
+                internal StageFragment(in string name, in TContentType content,
+                    in TSharedContentType sharedContent)
                 {
-                    this.Name = name;
-                    this.Content = content;
-                    this.SharedContent = sharedContent;
+                    Name = name;
+                    Content = content;
+                    SharedContent = sharedContent;
                 }
+
+                internal string Name { get; }
+
+                internal TContentType Content { get; }
+
+                internal TSharedContentType SharedContent { get; }
             }
-        }
-
-        internal void maybeCompact()
-        {
-            if (aggressiveCompaction) Compact();
-        }
-
-        private Graph(in Builder builder)
-        {
-            this.RootVersion = new Version<ContentType, SharedContentType>();
-            this.versions.Add(this.RootVersion);
-
-            foreach(var fragment in builder.Fragments)
-            {
-                var stage = new Stage<ContentType, SharedContentType>(
-                    fragment.Content,
-                    fragment.SharedContent,
-                    fragment.Name,
-                    this.RootVersion);
-                this.stages.Add(fragment.Name, stage);
-                this.RootVersion.AddStage(stage);
-            }
-
-            this.aggressiveCompaction = builder.aggressiveCompaction;
         }
     }
 }

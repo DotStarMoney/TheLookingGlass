@@ -1,103 +1,124 @@
 ﻿using System;
 using System.Collections.Generic;
+using TheLookingGlass.Util;
 
 namespace TheLookingGlass.StageGraph
 {
-    internal sealed class Version<ContentType, SharedContentType>
+    internal sealed class Version<TContentType, TSharedContentType>
     {
-        private uint parentN = 0;
+        private readonly Dictionary<Version<TContentType, TSharedContentType>, uint> _embeddingLinksN =
+            new Dictionary<Version<TContentType, TSharedContentType>, uint>();
 
-        private uint indexRefN = 1;
+        private uint _indexRefN = 1;
+        private uint _parentN;
 
-        private Dictionary<Version<ContentType, SharedContentType>, uint> embeddingLinksN = 
-            new Dictionary<Version<ContentType, SharedContentType>, uint>();
-
-        private HashSet<Stage<ContentType, SharedContentType>> inStages = 
-            new HashSet<Stage<ContentType, SharedContentType>>();
-
-        internal HashSet<Stage<ContentType, SharedContentType>> InStages { get { return inStages; } }        
-
-        internal Version<ContentType, SharedContentType> BaseVersion { get; set; }
-
-        internal Version(in Version<ContentType, SharedContentType> baseVersion = null)
+        internal Version(in Version<TContentType, TSharedContentType> baseVersion = null)
         {
-            this.BaseVersion = baseVersion;
+            BaseVersion = baseVersion;
         }
 
-        internal void ForEachUniqueNonRootLink(in Action<Version<ContentType, SharedContentType>> fn)
+        internal HashSet<Stage<TContentType, TSharedContentType>> InStages { get; } =
+            new HashSet<Stage<TContentType, TSharedContentType>>();
+
+        internal Version<TContentType, TSharedContentType> BaseVersion { get; set; }
+
+        internal void ForEachUniqueNonRootLink(in Action<Version<TContentType, TSharedContentType>> fn)
         {
             if (IsRoot()) return;
-            foreach (KeyValuePair<Version<ContentType, SharedContentType>, uint> entry in embeddingLinksN)
+            foreach (var entry in _embeddingLinksN)
             {
-                if (!entry.Key.IsRoot() && (entry.Key != BaseVersion)) fn(entry.Key);
+                if (!entry.Key.IsRoot() && entry.Key != BaseVersion) fn(entry.Key);
             }
+
             fn(BaseVersion);
         }
 
-        internal void IncIndexRefs() => indexRefN++;
+        internal void IncIndexRefs()
+        {
+            _indexRefN++;
+        }
+
         internal void DecIndexRefs()
         {
-            if (indexRefN == 0)
+            if (_indexRefN == 0)
             {
                 throw ExUtils.RuntimeException("Index reference count underflow in {0}.", this);
             }
-            --indexRefN;
+            --_indexRefN;
         }
 
-        internal bool ReferencedByIndex() => indexRefN != 0;
+        internal bool ReferencedByIndex()
+        {
+            return _indexRefN != 0;
+        }
 
         internal bool Overwritable()
         {
-            if (indexRefN == 0)
+            if (_indexRefN == 0)
             {
                 throw ExUtils.RuntimeException("Version should only be tested for overwrite when "
-                    + "referenced at least once in {0}.", this);
+                                               + "referenced at least once in {0}.", this);
             }
-            return (indexRefN == 1) && HasNoParents();
+
+            return _indexRefN == 1 && HasNoParents();
         }
 
-        internal void AddStage(in Stage<ContentType, SharedContentType> stage) => inStages.Add(stage);
-
-        internal void RemoveStage(in Stage<ContentType, SharedContentType> stage) => inStages.Remove(stage);
-
-        internal void IncLinksToEmbeddedVersion(in Version<ContentType, SharedContentType> linkVersion)
+        internal void AddStage(in Stage<TContentType, TSharedContentType> stage)
         {
-            if (!embeddingLinksN.ContainsKey(linkVersion))
+            InStages.Add(stage);
+        }
+
+        internal void RemoveStage(in Stage<TContentType, TSharedContentType> stage)
+        {
+            InStages.Remove(stage);
+        }
+
+        internal void IncLinksToEmbeddedVersion(in Version<TContentType, TSharedContentType> linkVersion)
+        {
+            if (!_embeddingLinksN.ContainsKey(linkVersion))
             {
-                embeddingLinksN.Add(linkVersion, 1);
+                _embeddingLinksN.Add(linkVersion, 1);
                 return;
             }
-            embeddingLinksN[linkVersion]++;
+
+            _embeddingLinksN[linkVersion]++;
         }
 
-        internal void DecLinksToEmbeddedVersion(in Version<ContentType, SharedContentType> linkVersion)
+        internal void DecLinksToEmbeddedVersion(in Version<TContentType, TSharedContentType> linkVersion)
         {
-            if (!embeddingLinksN.ContainsKey(linkVersion))
+            if (!_embeddingLinksN.ContainsKey(linkVersion))
             {
-                throw ExUtils.RuntimeException("Linked embedded version {0} not present in {1}.", 
+                throw ExUtils.RuntimeException("Linked embedded version {0} not present in {1}.",
                     linkVersion, this);
             }
-            if (--embeddingLinksN[linkVersion] == 0) _ = embeddingLinksN.Remove(linkVersion);
-            
+
+            if (--_embeddingLinksN[linkVersion] == 0) _ = _embeddingLinksN.Remove(linkVersion);
         }
 
-        internal void IncParentN() => ++parentN;
+        internal void IncParentN()
+        {
+            ++_parentN;
+        }
+
         internal void DecParentN()
         {
-            if (parentN == 0)
-            {
-                throw ExUtils.RuntimeException("Parent count underflow in {0}.", this);
-            }
-            --parentN;
+            if (_parentN == 0) throw ExUtils.RuntimeException("Parent count underflow in {0}.", this);
+            --_parentN;
         }
 
-        internal bool HasNoParents() => parentN == 0;
+        internal bool HasNoParents()
+        {
+            return _parentN == 0;
+        }
 
-        internal bool IsRoot() => BaseVersion == null;
+        internal bool IsRoot()
+        {
+            return BaseVersion == null;
+        }
 
         public override string ToString()
         {
-            return String.Format("Version<{0}>", GetHashCode());
+            return $"Version<{GetHashCode()}>";
         }
     }
 }

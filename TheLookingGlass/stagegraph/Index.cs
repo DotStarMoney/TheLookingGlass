@@ -1,54 +1,55 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using TheLookingGlass.Util;
 
 namespace TheLookingGlass.StageGraph
 {
-    public class Index<ContentType, SharedContentType>
+    public class Index<TContentType, TSharedContentType>
     {
-        private Graph<ContentType, SharedContentType> graph;
+        private Graph<TContentType, TSharedContentType> _graph;
 
-        internal Version<ContentType, SharedContentType> version;
+        internal Version<TContentType, TSharedContentType> Version;
 
-        internal Stage<ContentType, SharedContentType> stage;
+        internal Stage<TContentType, TSharedContentType> Stage;
 
         internal Index(
-            in Graph<ContentType, SharedContentType> graph,
-            in Version<ContentType, SharedContentType> version,
-            in Stage<ContentType, SharedContentType> stage)
+            in Graph<TContentType, TSharedContentType> graph,
+            in Version<TContentType, TSharedContentType> version,
+            in Stage<TContentType, TSharedContentType> stage)
         {
-            this.graph = graph;
-            this.version = version;
-            this.stage = stage;
+            this._graph = graph;
+            this.Version = version;
+            this.Stage = stage;
         }
 
-        public SharedContentType GetSharedContent()
+        public TSharedContentType GetSharedContent()
         {
             CheckValid();
-            return stage.SharedContent;
+            return Stage.SharedContent;
         }
 
         public string GetStage()
         {
             CheckValid();
-            return stage.Name;
+            return Stage.Name;
         }
 
-        public void GetContent(in Action<ContentType> consumer)
+        public void GetContent(in Action<TContentType> consumer)
         {
             CheckValid();
-            List<ContentType> contentList = new List<ContentType>();
-            for (var scene = stage.GetScene(version); scene != null; scene = scene.Basis)
+            var contentList = new List<TContentType>();
+            for (var scene = Stage.GetScene(Version); scene != null; scene = scene.Basis)
             {
                 contentList.Add(scene.Content);
             }
-            for (int i = contentList.Count - 1; i >= 0; --i) consumer(obj: contentList[i]);
+            for (var i = contentList.Count - 1; i >= 0; --i) consumer(contentList[i]);
         }
 
-        public ContentType GetContent()
+        public TContentType GetContent()
         {
             CheckValid();
-            var scene = stage.GetScene(version);
+            var scene = Stage.GetScene(Version);
             if (scene.Basis != null)
             {
                 throw ExUtils.RuntimeException("Content has basis but single content requested.");
@@ -59,72 +60,74 @@ namespace TheLookingGlass.StageGraph
         public void Go(in string stageName)
         {
             CheckValid();
-            stage = graph.GetStage(stageName);
+            Stage = _graph.GetStage(stageName);
         }
 
         public void SetContent(
-            in Func<IEnumerable<EmbedToken>, ContentType> contentProvider,
-            in IEnumerable<Index<ContentType, SharedContentType>> toEmbed,
+            in Func<IEnumerable<EmbedToken>, TContentType> contentProvider,
+            in IEnumerable<Index<TContentType, TSharedContentType>> toEmbed,
             in bool linkBase = false)
         {
             SetContent(contentProvider, toEmbed, Enumerable.Empty<EmbedToken>(), linkBase);
         }
 
         public void SetContent(
-            ContentType content,
+            TContentType content,
             in IEnumerable<EmbedToken> toUnembed,
             in bool linkBase = false)
         {
             SetContent(
                 _ => content, 
-                Enumerable.Empty<Index<ContentType, SharedContentType>>(), 
+                Enumerable.Empty<Index<TContentType, TSharedContentType>>(), 
                 toUnembed, 
                 linkBase);
         }
 
-        public void SetContent(ContentType content, in bool linkBase = false)
+        public void SetContent(TContentType content, in bool linkBase = false)
         {
-            SetContent(_ => content, Enumerable.Empty<Index<ContentType, SharedContentType>>(), linkBase);
+            SetContent(_ => content, Enumerable.Empty<Index<TContentType, TSharedContentType>>(), linkBase);
         }
 
         public void SetContent(
-            in Func<IEnumerable<EmbedToken>, ContentType> contentProvider,
-            in IEnumerable<Index<ContentType, SharedContentType>> toEmbed,
+            in Func<IEnumerable<EmbedToken>, TContentType> contentProvider,
+            in IEnumerable<Index<TContentType, TSharedContentType>> toEmbed,
             in IEnumerable<EmbedToken> toUnembed,
             in bool linkBase = false)
         {
             CheckValid();
-            var scene = stage.GetScene(version);
+            var scene = Stage.GetScene(Version);
 
-            var updatedVersion = version;
-            if (!version.Overwritable())
+            var updatedVersion = Version;
+            if (!Version.Overwritable())
             {
-                version.DecIndexRefs();
-                version.IncParentN();
+                Version.DecIndexRefs();
+                Version.IncParentN();
 
-                updatedVersion = new Version<ContentType, SharedContentType>(version);
-                graph.versions.Add(updatedVersion);
-                updatedVersion.AddStage(stage);
+                updatedVersion = new Version<TContentType, TSharedContentType>(Version);
+                _graph.Versions.Add(updatedVersion);
+                updatedVersion.AddStage(Stage);
             }
             else
             {
-                if (version == scene.Version)
+                if (Version == scene.Version)
                 {
                     if (linkBase)
                     {
-                        var dummyScene = new Scene<ContentType, SharedContentType>(null, null, scene.Basis);
-                        dummyScene.Content = scene.Content;
-                        scene.basis = dummyScene;
+                        var tempScene = new Scene<TContentType, TSharedContentType>(null, null, scene.Basis)
+                        {
+                            Content = scene.Content
+                        };
+                        scene.Basis = tempScene;
                     }
                     Unembed(scene, toUnembed);
-                    scene.Content = contentProvider(Embed(version, scene, toEmbed));
+                    scene.Content = contentProvider(Embed(Version, scene, toEmbed));
                     return;
                 }
-                updatedVersion.AddStage(stage);
+                updatedVersion.AddStage(Stage);
             }
 
-            var newScene = new Scene<ContentType, SharedContentType>(
-                stage,
+            var newScene = new Scene<TContentType, TSharedContentType>(
+                Stage,
                 updatedVersion,
                 linkBase ? scene : null);
 
@@ -137,12 +140,12 @@ namespace TheLookingGlass.StageGraph
             Unembed(newScene, toUnembed);
             newScene.Content = contentProvider(Embed(updatedVersion, newScene, toEmbed));
 
-            stage.AddScene(newScene);
-            version = updatedVersion;
+            Stage.AddScene(newScene);
+            Version = updatedVersion;
         }
 
-        private void Unembed(
-            in Scene<ContentType, SharedContentType> fromScene,
+        private static void Unembed(
+            in Scene<TContentType, TSharedContentType> fromScene,
             in IEnumerable<EmbedToken> toUnembed)
         {
             foreach (var token in toUnembed)
@@ -156,82 +159,79 @@ namespace TheLookingGlass.StageGraph
             }
         }
 
-        private IEnumerable<EmbedToken> Embed(
-            in Version<ContentType, SharedContentType> fromVersion,
-            in Scene<ContentType, SharedContentType> fromScene,
-            in IEnumerable<Index<ContentType, SharedContentType>> toEmbed)
+        private static IEnumerable<EmbedToken> Embed(
+            in Version<TContentType, TSharedContentType> fromVersion,
+            in Scene<TContentType, TSharedContentType> fromScene,
+            in IEnumerable<Index<TContentType, TSharedContentType>> toEmbed)
         {
-            List<EmbedToken> tokens = new List<EmbedToken>();
+            var tokens = new List<EmbedToken>();
             foreach (var embedIndex in toEmbed)
             {
-                var embedVersion = embedIndex.version;
+                var embedVersion = embedIndex.Version;
                 embedVersion.DecIndexRefs();
                 embedVersion.IncParentN();
 
                 fromVersion.IncLinksToEmbeddedVersion(embedVersion);
-                tokens.Add(fromScene.AddDescendant(embedIndex.stage.GetScene(embedVersion), embedVersion));
+                tokens.Add(fromScene.AddDescendant(embedIndex.Stage.GetScene(embedVersion), embedVersion));
 
                 embedIndex.Invalidate();
             }
             return tokens;
         }
 
-        public Index<ContentType, SharedContentType> IndexFromEmbedded(in EmbedToken token)
+        public Index<TContentType, TSharedContentType> IndexFromEmbedded(in EmbedToken token)
         {
             CheckValid();
-            var scene = stage.GetScene(version);
+            var scene = Stage.GetScene(Version);
 
             var descendant = scene.GetDescendant(token);
             descendant.ObservedAt.IncIndexRefs();
 
-            return new Index<ContentType, SharedContentType>(
-                graph,
+            return new Index<TContentType, TSharedContentType>(
+                _graph,
                 descendant.ObservedAt,
                 descendant.Target.Stage);
         }
 
-        public Index<ContentType, SharedContentType> Clone()
+        public Index<TContentType, TSharedContentType> Clone()
         {
             CheckValid();
-            version.IncIndexRefs();
-            return new Index<ContentType, SharedContentType>(graph, version, stage);
+            Version.IncIndexRefs();
+            return new Index<TContentType, TSharedContentType>(_graph, Version, Stage);
         }
 
-        public void Replace(in Index<ContentType, SharedContentType> index)
+        public void Replace(in Index<TContentType, TSharedContentType> index)
         {
             Release();
-            graph = index.graph;
-            version = index.version;
-            stage = index.stage;
+            _graph = index._graph;
+            Version = index.Version;
+            Stage = index.Stage;
             index.Invalidate();
 
-            graph.maybeCompact();
+            _graph.MaybeCompact();
         }
 
         public void Release()
         {
             if (!IsValid()) return;
-            version.DecIndexRefs();
+            Version.DecIndexRefs();
 
-            graph.maybeCompact();
+            _graph.MaybeCompact();
             Invalidate();
         }
 
-        public bool IsValid() => graph != null;
+        public bool IsValid() => _graph != null;
             
         private void CheckValid()
         {
-            if (!IsValid())
-            {
-                throw ExUtils.RuntimeException("Invalid Index.");
-            }
+            if (!IsValid()) throw ExUtils.RuntimeException("Invalid Index.");
         }
 
         private void Invalidate()
         {
-            graph = null;
-            version = null;
-            stage = null;
+            _graph = null;
+            Version = null;
+            Stage = null;
         }
     }
 }

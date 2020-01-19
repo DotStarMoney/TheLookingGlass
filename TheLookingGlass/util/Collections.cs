@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace TheLookingGlass
+namespace TheLookingGlass.Util
 {
     public static class Collections
     {
@@ -11,21 +11,16 @@ namespace TheLookingGlass
 
         public static T GetOnlyElement<T>(in IEnumerable<T> enumerable)
         {
-            T onlyElement = default(T);
-            bool passed = false;
+            var onlyElement = default(T);
+            var passed = false;
             foreach (var element in enumerable)
             {
-                if (passed)
-                {
-                    throw ExUtils.RuntimeException("Enumerable had more than one element.");
-                }
+                if (passed) throw ExUtils.RuntimeException("Enumerable had more than one element.");
                 onlyElement = element;
                 passed = true;
             }
-            if (!passed)
-            {
-                throw ExUtils.RuntimeException("Enumerable had no elements.");
-            }
+
+            if (!passed) throw ExUtils.RuntimeException("Enumerable had no elements.");
             return onlyElement;
         }
     }

@@ -1,65 +1,70 @@
 ﻿using System;
 using System.Collections.Generic;
+using TheLookingGlass.Util;
 
 namespace TheLookingGlass.StageGraph
 {
-    internal sealed class Stage<ContentType, SharedContentType>
+    internal sealed class Stage<TContentType, TSharedContentType>
     {
-        internal SharedContentType SharedContent { get; }
+        internal Dictionary<
+            Version<TContentType, TSharedContentType>,
+            Scene<TContentType, TSharedContentType>> Scenes =
+                new Dictionary<
+                    Version<TContentType, TSharedContentType>, 
+                    Scene<TContentType, TSharedContentType>>();
+
+        internal Stage(in TContentType content, in TSharedContentType sharedContent, in string name,
+            in Version<TContentType, TSharedContentType> baseVersion)
+        {
+            SharedContent = sharedContent;
+            Name = name;
+            Scenes.Add(baseVersion, new Scene<TContentType, TSharedContentType>(this, content, baseVersion));
+        }
+
+        internal TSharedContentType SharedContent { get; }
 
         internal string Name { get; }
 
-        internal Dictionary<
-            Version<ContentType, SharedContentType>, 
-            Scene<ContentType, SharedContentType>> scenes =
-            new Dictionary<Version<ContentType, SharedContentType>, Scene<ContentType, SharedContentType>>();
-
-        internal Stage(in ContentType content, in SharedContentType sharedContent, in string name, 
-            in Version<ContentType, SharedContentType> baseVersion)
-        {
-            this.SharedContent = sharedContent;
-            this.Name = name;
-            scenes.Add(baseVersion, new Scene<ContentType, SharedContentType>(this, content, baseVersion));
-        }
-
-        internal void RemoveScene(in Version<ContentType, SharedContentType> version)
+        internal void RemoveScene(in Version<TContentType, TSharedContentType> version)
         {
             if (version.BaseVersion == null)
             {
                 throw ExUtils.RuntimeException("Cannot delete scene at version 0 in stage \"{0}\".", Name);
             }
-            if (!scenes.ContainsKey(version))
-            {
+
+            if (!Scenes.ContainsKey(version)) { 
                 throw ExUtils.RuntimeException("No scene at {0} exists in stage \"{1}\".", version, Name);
             }
-            scenes.Remove(version);
+
+            Scenes.Remove(version);
         }
 
-        internal void AddScene(in Scene<ContentType, SharedContentType> scene)
+        internal void AddScene(in Scene<TContentType, TSharedContentType> scene)
         {
-            if (scenes.ContainsKey(scene.Version))
+            if (Scenes.ContainsKey(scene.Version))
             {
-                throw ExUtils.RuntimeException("{0} already exists in stage \"{1}\".", scene.Version, Name);  
+                throw ExUtils.RuntimeException("{0} already exists in stage \"{1}\".", scene.Version, Name);
             }
-            scenes.Add(scene.Version, scene);
+
+            Scenes.Add(scene.Version, scene);
         }
 
-        internal Scene<ContentType, SharedContentType> GetScene(
-            Version<ContentType, SharedContentType> version)
+        internal Scene<TContentType, TSharedContentType> GetScene(
+            Version<TContentType, TSharedContentType> version)
         {
-            while(version != null)
+            while (version != null)
             {
-                if (scenes.ContainsKey(version)) return scenes[version];
+                if (Scenes.ContainsKey(version)) return Scenes[version];
                 version = version.BaseVersion;
             }
+
             throw ExUtils.RuntimeException(
                 "Versions exhausted looking for {0} in stage \"{1}\".", version, Name);
         }
 
-        internal void ForEachScene(in Action<Scene<ContentType, SharedContentType>> fn)
+        internal void ForEachScene(in Action<Scene<TContentType, TSharedContentType>> fn)
         {
-            foreach (var sceneEntry in scenes) fn(sceneEntry.Value);
+            foreach (var sceneEntry in Scenes) fn(sceneEntry.Value);
         }
     }
 }
-

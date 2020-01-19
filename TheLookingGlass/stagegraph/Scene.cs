@@ -1,81 +1,77 @@
 ﻿using System;
+using TheLookingGlass.Util;
 
 namespace TheLookingGlass.StageGraph
 {
-    internal sealed class Scene<ContentType, SharedContentType>
+    internal sealed class Scene<TContentType, TSharedContentType>
     {
-        internal Stage<ContentType, SharedContentType> stage;
+        internal Stage<TContentType, TSharedContentType> Stage { get; private set; }
 
-        internal Stage<ContentType, SharedContentType> Stage { get => stage; }
+        private TContentType _content;
 
-        private ContentType content;
-
-        internal ContentType Content
+        internal TContentType Content
         {
             get
             {
-                if (content == null)
+                if (_content == null)
                 {
                     throw ExUtils.RuntimeException("Content not set.");
                 }
-                return content;
+                return _content;
             }
-            set => content = value;
+            set => _content = value;
         }
 
-        private Version<ContentType, SharedContentType> version;
+        internal Version<TContentType, TSharedContentType> Version { get; private set; }
 
-        internal Version<ContentType, SharedContentType> Version { get => version; }
+        internal Scene<TContentType, TSharedContentType> Basis { get; set; }
 
-        internal Scene<ContentType, SharedContentType> basis;
+        internal ClaimCheck<Descendant> Descendants = new ClaimCheck<Descendant>();
 
-        internal Scene<ContentType, SharedContentType> Basis { get => basis; }
-
-        internal ClaimCheck<Descendant> descendants = new ClaimCheck<Descendant>();
         internal Scene(
-            in Stage<ContentType, SharedContentType> owner,
-            in Version<ContentType, SharedContentType> version,
-            in Scene<ContentType, SharedContentType> basis = null)
+            in Stage<TContentType, TSharedContentType> owner,
+            in Version<TContentType, TSharedContentType> version,
+            in Scene<TContentType, TSharedContentType> basis = null)
         {
-            this.stage = owner;
-            this.version = version;
-            this.basis = basis;
+            this.Stage = owner;
+            this.Version = version;
+            this.Basis = basis;
         }
 
         internal Scene(
-            in Stage<ContentType, SharedContentType> owner,
-            in ContentType content,
-            in Version<ContentType, SharedContentType> version, 
-            in Scene<ContentType, SharedContentType> basis = null) : this(owner, version, basis)
+            in Stage<TContentType, TSharedContentType> owner,
+            in TContentType content,
+            in Version<TContentType, TSharedContentType> version, 
+            in Scene<TContentType, TSharedContentType> basis = null) : this(owner, version, basis)
         {
-            this.content = content;            
+            this._content = content;            
         }
 
         internal void ForEachDescendant(
-            in Action<Scene<ContentType, SharedContentType>, Version<ContentType, SharedContentType>> fn)
+            in Action<Scene<TContentType, TSharedContentType>, Version<TContentType, TSharedContentType>> fn)
         {
-            foreach (var descendant in descendants) fn(descendant.Target, descendant.ObservedAt);
+            foreach (var descendant in Descendants) fn(descendant.Target, descendant.ObservedAt);
         }
 
         internal EmbedToken AddDescendant(
-            in Scene<ContentType, SharedContentType> target, 
-            in Version<ContentType, SharedContentType> observedAt)
+            in Scene<TContentType, TSharedContentType> target, 
+            in Version<TContentType, TSharedContentType> observedAt)
         {
-            return new EmbedToken(descendants.Add(new Descendant(target, observedAt)));
+            return new EmbedToken(Descendants.Add(new Descendant(target, observedAt)));
         }
 
-        internal Descendant RemoveDescendant(in EmbedToken token) => descendants.Remove(token.LookupId);
+        internal Descendant RemoveDescendant(in EmbedToken token) => Descendants.Remove(token.LookupId);
 
-        internal Descendant GetDescendant(in EmbedToken token) => descendants.Get(token.LookupId);
+        internal Descendant GetDescendant(in EmbedToken token) => Descendants.Get(token.LookupId);
 
         internal sealed class Descendant
         {
-            internal Scene<ContentType, SharedContentType> Target { get; }
-            internal Version<ContentType, SharedContentType> ObservedAt { get; }
+            internal Scene<TContentType, TSharedContentType> Target { get; }
+            internal Version<TContentType, TSharedContentType> ObservedAt { get; }
 
             internal Descendant(
-                in Scene<ContentType, SharedContentType> target,
-                in Version<ContentType, SharedContentType> observedAt)
+                in Scene<TContentType, TSharedContentType> target,
+                in Version<TContentType, TSharedContentType> observedAt)
             {
                 this.Target = target;
                 this.ObservedAt = observedAt;
@@ -84,8 +80,8 @@ namespace TheLookingGlass.StageGraph
 
         internal void ClearForGc()
         {
-            stage = null;
-            version = null;
+            Stage = null;
+            Version = null;
         }
     }
 }

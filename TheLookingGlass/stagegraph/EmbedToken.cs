@@ -2,11 +2,11 @@
 {
     public class EmbedToken
     {
-        internal int LookupId { get; }
-
         internal EmbedToken(in int lookupId)
         {
-            this.LookupId = lookupId;
+            LookupId = lookupId;
         }
+
+        internal int LookupId { get; }
     }
 }

@@ -43,8 +43,18 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="actormodel\Actor.cs" />
+    <Compile Include="actormodel\ActorBank.cs" />
+    <Compile Include="actormodel\ActorManager.cs" />
+    <Compile Include="deepclone\AttributesCollections.cs" />
+    <Compile Include="deepclone\DeepCloner.cs" />
+    <Compile Include="deepclone\Extensions.cs" />
+    <Compile Include="deepclone\FastDeepClonerCachedItems.cs" />
+    <Compile Include="deepclone\FastDeepClonerIgnore.cs" />
+    <Compile Include="deepclone\FastDeepClonerProperty.cs" />
+    <Compile Include="deepclone\IFastDeepClonerProperty.cs" />
+    <Compile Include="deepclone\ReferenceClone.cs" />
+    <Compile Include="deepclone\SafeValueType.cs" />
     <Compile Include="core\IAdvanceable.cs" />
-    <Compile Include="core\ICloneable.cs" />
     <Compile Include="math\ITransformable.cs" />
     <Compile Include="math\Transform.cs" />
     <Compile Include="util\ClaimCheck.cs" />
