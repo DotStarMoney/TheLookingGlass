@@ -185,10 +185,7 @@ namespace TheLookingGlass.StageGraph
             return new Index<TContentType, TSharedContentType>(this, RootVersion, GetStage(stageName));
         }
 
-        public static Builder NewBuilder()
-        {
-            return new Builder();
-        }
+        public static Builder NewBuilder() => new Builder();
 
         internal void MaybeCompact()
         {

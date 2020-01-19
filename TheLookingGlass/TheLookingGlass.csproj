@@ -46,10 +46,10 @@
     <Compile Include="actormodel\ActorBank.cs" />
     <Compile Include="actormodel\ActorManager.cs" />
     <Compile Include="deepclone\IndexedAttributes.cs" />
-    <Compile Include="deepclone\Extensions.cs" />
-    <Compile Include="deepclone\FastDeepClonerCachedItems.cs" />
-    <Compile Include="deepclone\FastDeepClonerIgnore.cs" />
-    <Compile Include="deepclone\FastDeepClonerProperty.cs" />
+    <Compile Include="deepclone\TypeCheckingExtensions.cs" />
+    <Compile Include="deepclone\ReflectionCache.cs" />
+    <Compile Include="deepclone\Uncloneable.cs" />
+    <Compile Include="deepclone\ObjectVariable.cs" />
     <Compile Include="deepclone\DeepCloner.cs" />
     <Compile Include="deepclone\DictionaryExtensions.cs" />
     <Compile Include="core\IAdvanceable.cs" />

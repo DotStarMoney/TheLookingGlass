@@ -33,10 +33,7 @@ namespace TheLookingGlass.StageGraph
             fn(BaseVersion);
         }
 
-        internal void IncIndexRefs()
-        {
-            _indexRefN++;
-        }
+        internal void IncIndexRefs() => _indexRefN++;
 
         internal void DecIndexRefs()
         {
@@ -47,10 +44,7 @@ namespace TheLookingGlass.StageGraph
             --_indexRefN;
         }
 
-        internal bool ReferencedByIndex()
-        {
-            return _indexRefN != 0;
-        }
+        internal bool ReferencedByIndex() => _indexRefN != 0;
 
         internal bool Overwritable()
         {
@@ -63,15 +57,9 @@ namespace TheLookingGlass.StageGraph
             return _indexRefN == 1 && HasNoParents();
         }
 
-        internal void AddStage(in Stage<TContentType, TSharedContentType> stage)
-        {
-            InStages.Add(stage);
-        }
+        internal void AddStage(in Stage<TContentType, TSharedContentType> stage) => InStages.Add(stage);
 
-        internal void RemoveStage(in Stage<TContentType, TSharedContentType> stage)
-        {
-            InStages.Remove(stage);
-        }
+        internal void RemoveStage(in Stage<TContentType, TSharedContentType> stage) => InStages.Remove(stage);
 
         internal void IncLinksToEmbeddedVersion(in Version<TContentType, TSharedContentType> linkVersion)
         {
@@ -95,10 +83,7 @@ namespace TheLookingGlass.StageGraph
             if (--_embeddingLinksN[linkVersion] == 0) _ = _embeddingLinksN.Remove(linkVersion);
         }
 
-        internal void IncParentN()
-        {
-            ++_parentN;
-        }
+        internal void IncParentN() => ++_parentN;
 
         internal void DecParentN()
         {
@@ -106,19 +91,10 @@ namespace TheLookingGlass.StageGraph
             --_parentN;
         }
 
-        internal bool HasNoParents()
-        {
-            return _parentN == 0;
-        }
+        internal bool HasNoParents() => _parentN == 0;
 
-        internal bool IsRoot()
-        {
-            return BaseVersion == null;
-        }
+        internal bool IsRoot() => BaseVersion == null;
 
-        public override string ToString()
-        {
-            return $"Version<{GetHashCode()}>";
-        }
+        public override string ToString() => $"Version<{GetHashCode()}>";
     }
 }

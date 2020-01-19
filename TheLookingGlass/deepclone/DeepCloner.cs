@@ -17,7 +17,7 @@ namespace TheLookingGlass.DeepClone
         }
 
         private static object CloneReference(
-            in Dictionary<string, FastDeepClonerProperty> properties, 
+            in Dictionary<string, ObjectVariable> properties, 
             in Type primaryType, 
             in object objectToBeCloned, 
             in object appendToValue = null)
@@ -26,7 +26,7 @@ namespace TheLookingGlass.DeepClone
 
             foreach (var property in properties.Values)
             {
-                if (!property.CanRead || property.FastDeepClonerIgnore) continue;
+                if (!property.CanRead || property.Uncloneable) continue;
 
                 var value = property.GetValue(objectToBeCloned);
                 if (value == null) continue;
@@ -90,7 +90,7 @@ namespace TheLookingGlass.DeepClone
                     x => !StringListPropertyKeys.Contains(x.Key)))
                 {
                     var property = prop.Value;
-                    if (!property.CanRead || property.FastDeepClonerIgnore) continue;
+                    if (!property.CanRead || property.Uncloneable) continue;
 
                     var value = property.GetValue(objectToBeCloned);
                     if (value == null) continue;

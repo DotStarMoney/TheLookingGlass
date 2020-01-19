@@ -41,10 +41,7 @@ namespace TheLookingGlass.Util
             }
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         public int Add(in T x)
         {

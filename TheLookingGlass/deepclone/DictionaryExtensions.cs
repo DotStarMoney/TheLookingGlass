@@ -2,9 +2,9 @@
 
 namespace TheLookingGlass.DeepClone
 {
-    public static class DictionaryExtensions
+    internal static class DictionaryExtensions
     {
-        public static void SafeTryAdd<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key,
+        internal static void SafeTryAdd<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key,
             TValue value, bool overwrite = false)
         {
             if (dict.ContainsKey(key))
@@ -17,8 +17,7 @@ namespace TheLookingGlass.DeepClone
             }
         }
 
-        // Explicitly storing nulls in the dictionary is incompatible with this method.
-        public static TValue SafeGetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key,
+        internal static TValue SafeGetOrAdd<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key,
             TValue value, bool overwrite = false)
         {
             dict.TryGetValue(key, out var existingValue);
@@ -41,7 +40,7 @@ namespace TheLookingGlass.DeepClone
             return value;
         }
 
-        public static TValue SafeGet<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key)
+        internal static TValue SafeGet<TKey, TValue>(this Dictionary<TKey, TValue> dict, TKey key)
         {
             dict.TryGetValue(key, out var existingValue);
             return existingValue;

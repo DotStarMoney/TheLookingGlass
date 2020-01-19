@@ -5,36 +5,36 @@ using System.Collections.Generic;
 
 namespace TheLookingGlass.DeepClone
 {
-    public class FastDeepClonerProperty
+    internal class ObjectVariable
     {
-        public Func<object, object> GetMethod { get; set; }
+        internal Func<object, object> GetMethod { get; set; }
 
-        public Action<object, object> SetMethod { get; set; }
+        internal Action<object, object> SetMethod { get; set; }
 
-        public bool CanRead { get; }
+        internal bool CanRead { get; }
 
-        public bool CanWrite { get; }
+        internal bool CanWrite { get; }
 
-        public bool ReadAble { get; }
+        internal bool ReadAble { get; }
 
-        public bool FastDeepClonerIgnore => ContainAttribute<FastDeepClonerIgnore>();
+        internal bool Uncloneable => ContainsAttribute<Uncloneable>();
 
-        public string Name { get; }
+        internal string Name { get; }
 
-        public string FullName { get; }
+        internal string FullName { get; }
 
-        public bool IsInternalType { get;  }
+        internal bool IsInternalType { get;  }
 
-        public Type PropertyType { get; set; }
+        internal Type PropertyType { get; set; }
 
-        public bool? IsVirtual { get; }
+        internal bool? IsVirtual { get; }
 
-        public IndexedAttributes IndexedAttributes { get; set; }
+        internal IndexedAttributes IndexedAttributes { get; set; }
 
-        public MethodInfo PropertyGetValue { get; }
+        internal MethodInfo PropertyGetValue { get; }
 
-        public MethodInfo PropertySetValue { get; }
-        internal FastDeepClonerProperty(FieldInfo field)
+        internal MethodInfo PropertySetValue { get; }
+        internal ObjectVariable(FieldInfo field)
         {
             CanRead = !(field.IsInitOnly || field.FieldType == typeof(IntPtr) || field.IsLiteral);
             CanWrite = CanRead;
@@ -48,9 +48,13 @@ namespace TheLookingGlass.DeepClone
             IsInternalType = field.FieldType.IsInternalType();
         }
 
-        internal FastDeepClonerProperty(PropertyInfo property)
+        internal ObjectVariable(PropertyInfo property)
         {
-            CanRead = !(!property.CanWrite || !property.CanRead || property.PropertyType == typeof(IntPtr) || property.GetIndexParameters().Length > 0);
+            CanRead = !(
+                !property.CanWrite 
+                || !property.CanRead 
+                || (property.PropertyType == typeof(IntPtr) )
+                || (property.GetIndexParameters().Length > 0));
             CanWrite = property.CanWrite;
             ReadAble = property.CanRead;
             GetMethod = property.GetValue;
@@ -66,19 +70,13 @@ namespace TheLookingGlass.DeepClone
 
         }
 
-        public bool ContainAttribute<T>() where T : Attribute
+        private bool ContainsAttribute<T>() where T : Attribute
         {
             return IndexedAttributes?.Index.ContainsKey(typeof(T)) ?? false;
         }
 
-        public void SetValue(object o, object value)
-        {
-            SetMethod(o, value);
-        }
-
-        public object GetValue(object o)
-        {
-            return GetMethod(o);
-        }
+        internal void SetValue(object o, object value) => SetMethod(o, value);
+        
+        internal object GetValue(object o) => GetMethod(o);
     }
 }

@@ -1,33 +1,41 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Globalization;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.Serialization;
 
 
 namespace TheLookingGlass.DeepClone
 {
-    internal static class FastDeepClonerCachedItems
+    internal static class ReflectionCache
     {
         internal delegate object ObjectActivator();
         internal delegate object ObjectActivatorWithParameters(params object[] args);
-        private static readonly Dictionary<Type, Dictionary<string, FastDeepClonerProperty>> CachedFields = new Dictionary<Type, Dictionary<string, FastDeepClonerProperty>>();
-        private static readonly Dictionary<Type, Dictionary<string, FastDeepClonerProperty>> CachedProperties = new Dictionary<Type, Dictionary<string, FastDeepClonerProperty>>();
-        private static readonly Dictionary<Type, Type> CachedTypes = new Dictionary<Type, Type>();
-        private static readonly Dictionary<string, ConstructorInfo> ConstructorInfo = new Dictionary<string, ConstructorInfo>();
-        private static readonly Dictionary<string, ObjectActivator> CachedDynamicMethod = new Dictionary<string, ObjectActivator>();
-        private static readonly Dictionary<string, ObjectActivatorWithParameters> CachedDynamicMethodWithParameters = new Dictionary<string, ObjectActivatorWithParameters>();
+
+        private static readonly Dictionary<Type, Dictionary<string, ObjectVariable>> CachedFields = 
+            new Dictionary<Type, Dictionary<string, ObjectVariable>>();
+
+        private static readonly Dictionary<Type, Dictionary<string, ObjectVariable>> CachedProperties = 
+            new Dictionary<Type, Dictionary<string, ObjectVariable>>();
+
+        private static readonly Dictionary<Type, Type> CachedIListTypes = 
+            new Dictionary<Type, Type>();
+
+        private static readonly Dictionary<string, ConstructorInfo> CachedConstructorInfo = 
+            new Dictionary<string, ConstructorInfo>();
+
+        private static readonly Dictionary<string, ObjectActivator> CachedDynamicMethods = 
+            new Dictionary<string, ObjectActivator>();
+
+        private static readonly Dictionary<string, ObjectActivatorWithParameters> 
+            CachedDynamicMethodsWithParameters = new Dictionary<string, ObjectActivatorWithParameters>();
 
         internal static ConstructorInfo GetConstructorInfo(this Type type, params object[] parameters)
         {
             var key = type.FullName + string.Join("", parameters?.Select(x => x.GetType()));
-            if (ConstructorInfo.ContainsKey(key))
-                return ConstructorInfo.SafeGet(key);
+            if (CachedConstructorInfo.ContainsKey(key))
+                return CachedConstructorInfo.SafeGet(key);
 
             IEnumerable<ConstructorInfo> constructors = type.GetConstructors();
 
@@ -77,7 +85,7 @@ namespace TheLookingGlass.DeepClone
                 }
             }
 
-            return ConstructorInfo.SafeGetOrAdd(key, constructor);
+            return CachedConstructorInfo.SafeGetOrAdd(key, constructor);
         }
 
         internal static object Creator(this Type type, bool validateArgs = true, params object[] parameters)
@@ -113,13 +121,13 @@ namespace TheLookingGlass.DeepClone
 
                     if (!constParam.Any())
                     {
-                        if (CachedDynamicMethod.ContainsKey(key))
-                            return CachedDynamicMethod[key]();
+                        if (CachedDynamicMethods.ContainsKey(key))
+                            return CachedDynamicMethods[key]();
                     }
-                    else if (CachedDynamicMethodWithParameters.ContainsKey(key))
-                        return CachedDynamicMethodWithParameters[key](parameters);
+                    else if (CachedDynamicMethodsWithParameters.ContainsKey(key))
+                        return CachedDynamicMethodsWithParameters[key](parameters);
 
-                    lock (CachedDynamicMethod)
+                    lock (CachedDynamicMethods)
                     {
                         var dynamicMethod = new System.Reflection.Emit.DynamicMethod("CreateInstance", type, (constParam.Any() ? new Type[] { typeof(object[]) } : Type.EmptyTypes), true);
                         System.Reflection.Emit.ILGenerator ilGenerator = dynamicMethod.GetILGenerator();
@@ -152,9 +160,9 @@ namespace TheLookingGlass.DeepClone
                         ilGenerator.Emit(System.Reflection.Emit.OpCodes.Ret);
 
                         if (!constParam.Any())
-                            return CachedDynamicMethod.SafeGetOrAdd(key, (ObjectActivator)dynamicMethod.CreateDelegate(typeof(ObjectActivator)))();
+                            return CachedDynamicMethods.SafeGetOrAdd(key, (ObjectActivator)dynamicMethod.CreateDelegate(typeof(ObjectActivator)))();
                         
-                        return CachedDynamicMethodWithParameters.SafeGetOrAdd(key, (ObjectActivatorWithParameters)dynamicMethod.CreateDelegate(typeof(ObjectActivatorWithParameters)))(parameters);
+                        return CachedDynamicMethodsWithParameters.SafeGetOrAdd(key, (ObjectActivatorWithParameters)dynamicMethod.CreateDelegate(typeof(ObjectActivatorWithParameters)))(parameters);
                     }
 
                 }
@@ -169,70 +177,72 @@ namespace TheLookingGlass.DeepClone
             }
         }
 
-        internal static Dictionary<string, FastDeepClonerProperty> GetCachedProperties(this Type primaryType)
+        internal static Dictionary<string, ObjectVariable> GetCachedProperties(this Type type)
         {
-            CachedProperties.TryGetValue(primaryType, out var cachedProperties);
+            CachedProperties.TryGetValue(type, out var cachedProperties);
             if (cachedProperties != null) return cachedProperties;
 
-            var properties = primaryType.GetPropertiesFromType();
-            CachedProperties.Add(primaryType, properties);
+            var properties = type.GetPropertiesFromType();
+            CachedProperties.Add(type, properties);
             return properties;
         }
 
-        internal static Dictionary<string, FastDeepClonerProperty> GetPropertiesFromType(
-            this Type primaryType)
+        internal static Dictionary<string, ObjectVariable> GetPropertiesFromType(this Type type)
         {
-            var properties = new Dictionary<string, FastDeepClonerProperty>();
-            foreach (var runtimeProperty in primaryType.GetRuntimeProperties())
+            var properties = new Dictionary<string, ObjectVariable>();
+            foreach (var runtimeProperty in type.GetRuntimeProperties())
             {
-                properties.SafeTryAdd(runtimeProperty.Name, new FastDeepClonerProperty(runtimeProperty));
+                properties.SafeTryAdd(runtimeProperty.Name, new ObjectVariable(runtimeProperty));
             }
 
-            if ((primaryType.GetTypeInfo().BaseType != null)
-                && (primaryType.GetTypeInfo().BaseType.Name != "Object"))
+            if ((type.GetTypeInfo().BaseType != null)
+                && (type.GetTypeInfo().BaseType.Name != "Object"))
             {
-                foreach (var runtimeProperty in primaryType.GetTypeInfo().BaseType.GetRuntimeProperties())
+                foreach (var runtimeProperty in type.GetTypeInfo().BaseType.GetRuntimeProperties())
                 {
-                    properties.SafeTryAdd(runtimeProperty.Name, new FastDeepClonerProperty(runtimeProperty));
+                    properties.SafeTryAdd(runtimeProperty.Name, new ObjectVariable(runtimeProperty));
                 }
             }
 
             return properties;
         }
 
-        internal static Dictionary<string, FastDeepClonerProperty> GetCachedFieldsExcludingProperties(
-            this Type primaryType, in Dictionary<string, FastDeepClonerProperty> typeProperties)
+        internal static Dictionary<string, ObjectVariable> GetCachedFieldsExcludingProperties(
+            this Type type, in Dictionary<string, ObjectVariable> typeProperties)
         {
-            CachedFields.TryGetValue(primaryType, out var cachedProperties);
+            CachedFields.TryGetValue(type, out var cachedProperties);
             if (cachedProperties != null) return cachedProperties;
 
-            var properties = new Dictionary<string, FastDeepClonerProperty>();
-            foreach (var runtimeField in primaryType.GetRuntimeFields())
+            var properties = new Dictionary<string, ObjectVariable>();
+            foreach (var runtimeField in type.GetRuntimeFields())
             {
                 if (typeProperties.ContainsKey(runtimeField.Name)) continue;
-                properties.SafeTryAdd(runtimeField.Name, new FastDeepClonerProperty(runtimeField));
+                properties.SafeTryAdd(runtimeField.Name, new ObjectVariable(runtimeField));
             }
 
-            if ((primaryType.GetTypeInfo().BaseType != null) 
-                && (primaryType.GetTypeInfo().BaseType.Name != "Object"))
+            if ((type.GetTypeInfo().BaseType != null) 
+                && (type.GetTypeInfo().BaseType.Name != "Object"))
             {
-                foreach (var runtimeField in primaryType.GetTypeInfo().BaseType.GetRuntimeFields())
+                foreach (var runtimeField in type.GetTypeInfo().BaseType.GetRuntimeFields())
                 {
                     if (typeProperties.ContainsKey(runtimeField.Name)) continue;
-                    properties.SafeTryAdd(runtimeField.Name, new FastDeepClonerProperty(runtimeField));
+                    properties.SafeTryAdd(runtimeField.Name, new ObjectVariable(runtimeField));
                 }
             }
 
-            CachedFields.Add(primaryType, properties);
+            CachedFields.Add(type, properties);
             return properties;
         }
 
         internal static Type GetIListType(this Type type)
         {
-            if (CachedTypes.ContainsKey(type)) return CachedTypes[type];
+            CachedIListTypes.TryGetValue(type, out var cachedType);
+            if (cachedType != null) return cachedType;
+
+            Type iListType;
             if (type.IsArray)
             {
-                CachedTypes.Add(type, type.GetElementType());
+                iListType = type.GetElementType();
             }
             else
             {
@@ -240,39 +250,35 @@ namespace TheLookingGlass.DeepClone
                 {
                     if (type.FullName.Contains("ObservableCollection`1"))
                     {
-                        CachedTypes.Add(
-                            type,
-                            typeof(ObservableCollection<>).MakeGenericType(
-                                type.GenericTypeArguments.First()));
+                        iListType = typeof(ObservableCollection<>).MakeGenericType(
+                            type.GenericTypeArguments.First());
                     }
                     else
                     {
-                        CachedTypes.Add(
-                            type,
-                            typeof(List<>).MakeGenericType(type.GenericTypeArguments.First()));
+                        iListType = typeof(List<>).MakeGenericType(type.GenericTypeArguments.First());
                     }
                 }
                 else if (type.FullName.Contains("List`1") || type.FullName.Contains("ObservableCollection`1"))
                 {
                     if (type.FullName.Contains("ObservableCollection`1"))
                     {
-                        CachedTypes.Add(
-                            type,
-                            typeof(ObservableCollection<>).MakeGenericType(type.GetRuntimeProperty("Item")
-                                .PropertyType));
+                        iListType = typeof(ObservableCollection<>).MakeGenericType(
+                            type.GetRuntimeProperty("Item").PropertyType);
                     }
                     else
                     {
-                        CachedTypes.Add(type,
-                            typeof(List<>).MakeGenericType(type.GetRuntimeProperty("Item").PropertyType));
+                        iListType =
+                            typeof(List<>).MakeGenericType(type.GetRuntimeProperty("Item").PropertyType);
                     }
                 }
                 else
                 {
-                    CachedTypes.Add(type, type);
+                    iListType = type;
                 }
             }
-            return CachedTypes[type];
+
+            CachedIListTypes.Add(type, iListType);
+            return iListType;
         }
     }
 }
