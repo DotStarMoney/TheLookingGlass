@@ -17,7 +17,7 @@ namespace TheLookingGlass.DeepClone
         internal delegate object ObjectActivator();
         internal delegate object ObjectActivatorWithParameters(params object[] args);
         private static readonly Dictionary<Type, Dictionary<string, FastDeepClonerProperty>> CachedFields = new Dictionary<Type, Dictionary<string, FastDeepClonerProperty>>();
-        private static readonly Dictionary<Type, Dictionary<string, FastDeepClonerProperty>> CachedPropertyInfo = new Dictionary<Type, Dictionary<string, FastDeepClonerProperty>>();
+        private static readonly Dictionary<Type, Dictionary<string, FastDeepClonerProperty>> CachedProperties = new Dictionary<Type, Dictionary<string, FastDeepClonerProperty>>();
         private static readonly Dictionary<Type, Type> CachedTypes = new Dictionary<Type, Type>();
         private static readonly Dictionary<string, ConstructorInfo> ConstructorInfo = new Dictionary<string, ConstructorInfo>();
         private static readonly Dictionary<string, ObjectActivator> CachedDynamicMethod = new Dictionary<string, ObjectActivator>();
@@ -169,73 +169,108 @@ namespace TheLookingGlass.DeepClone
             }
         }
 
-        internal static Dictionary<string, FastDeepClonerProperty> GetFastDeepClonerProperties(this Type primaryType)
+        internal static Dictionary<string, FastDeepClonerProperty> GetCachedProperties(this Type primaryType)
         {
-            if (CachedPropertyInfo.ContainsKey(primaryType)) return CachedPropertyInfo[primaryType];
+            CachedProperties.TryGetValue(primaryType, out var cachedProperties);
+            if (cachedProperties != null) return cachedProperties;
 
+            var properties = primaryType.GetPropertiesFromType();
+            CachedProperties.Add(primaryType, properties);
+            return properties;
+        }
+
+        internal static Dictionary<string, FastDeepClonerProperty> GetPropertiesFromType(
+            this Type primaryType)
+        {
             var properties = new Dictionary<string, FastDeepClonerProperty>();
             foreach (var runtimeProperty in primaryType.GetRuntimeProperties())
             {
                 properties.SafeTryAdd(runtimeProperty.Name, new FastDeepClonerProperty(runtimeProperty));
             }
 
-            if (primaryType.GetTypeInfo().BaseType != null && primaryType.GetTypeInfo().BaseType.Name != "Object")
+            if ((primaryType.GetTypeInfo().BaseType != null)
+                && (primaryType.GetTypeInfo().BaseType.Name != "Object"))
             {
                 foreach (var runtimeProperty in primaryType.GetTypeInfo().BaseType.GetRuntimeProperties())
                 {
                     properties.SafeTryAdd(runtimeProperty.Name, new FastDeepClonerProperty(runtimeProperty));
                 }
             }
-            
-            CachedPropertyInfo.Add(primaryType, properties);
-            return CachedPropertyInfo[primaryType];
+
+            return properties;
         }
 
-        internal static Dictionary<string, FastDeepClonerProperty> GetFastDeepClonerFields(this Type primaryType)
+        internal static Dictionary<string, FastDeepClonerProperty> GetCachedFieldsExcludingProperties(
+            this Type primaryType, in Dictionary<string, FastDeepClonerProperty> typeProperties)
         {
-            if (CachedFields.ContainsKey(primaryType)) return CachedFields[primaryType];
+            CachedFields.TryGetValue(primaryType, out var cachedProperties);
+            if (cachedProperties != null) return cachedProperties;
 
             var properties = new Dictionary<string, FastDeepClonerProperty>();
             foreach (var runtimeField in primaryType.GetRuntimeFields())
             {
+                if (typeProperties.ContainsKey(runtimeField.Name)) continue;
                 properties.SafeTryAdd(runtimeField.Name, new FastDeepClonerProperty(runtimeField));
             }
 
-            if (primaryType.GetTypeInfo().BaseType != null && primaryType.GetTypeInfo().BaseType.Name != "Object")
+            if ((primaryType.GetTypeInfo().BaseType != null) 
+                && (primaryType.GetTypeInfo().BaseType.Name != "Object"))
             {
                 foreach (var runtimeField in primaryType.GetTypeInfo().BaseType.GetRuntimeFields())
                 {
+                    if (typeProperties.ContainsKey(runtimeField.Name)) continue;
                     properties.SafeTryAdd(runtimeField.Name, new FastDeepClonerProperty(runtimeField));
                 }
             }
 
             CachedFields.Add(primaryType, properties);
-            return CachedFields[primaryType];
+            return properties;
         }
 
         internal static Type GetIListType(this Type type)
         {
-            if (CachedTypes.ContainsKey(type))
-                return CachedTypes[type];
+            if (CachedTypes.ContainsKey(type)) return CachedTypes[type];
             if (type.IsArray)
+            {
                 CachedTypes.Add(type, type.GetElementType());
+            }
             else
             {
                 if (type.GenericTypeArguments.Any())
                 {
                     if (type.FullName.Contains("ObservableCollection`1"))
-                        CachedTypes.Add(type, typeof(ObservableCollection<>).MakeGenericType(type.GenericTypeArguments.First()));
+                    {
+                        CachedTypes.Add(
+                            type,
+                            typeof(ObservableCollection<>).MakeGenericType(
+                                type.GenericTypeArguments.First()));
+                    }
                     else
-                        CachedTypes.Add(type, typeof(List<>).MakeGenericType(type.GenericTypeArguments.First()));
+                    {
+                        CachedTypes.Add(
+                            type,
+                            typeof(List<>).MakeGenericType(type.GenericTypeArguments.First()));
+                    }
                 }
                 else if (type.FullName.Contains("List`1") || type.FullName.Contains("ObservableCollection`1"))
                 {
                     if (type.FullName.Contains("ObservableCollection`1"))
-                        CachedTypes.Add(type, typeof(ObservableCollection<>).MakeGenericType(type.GetRuntimeProperty("Item").PropertyType));
+                    {
+                        CachedTypes.Add(
+                            type,
+                            typeof(ObservableCollection<>).MakeGenericType(type.GetRuntimeProperty("Item")
+                                .PropertyType));
+                    }
                     else
-                        CachedTypes.Add(type, typeof(List<>).MakeGenericType(type.GetRuntimeProperty("Item").PropertyType));
+                    {
+                        CachedTypes.Add(type,
+                            typeof(List<>).MakeGenericType(type.GetRuntimeProperty("Item").PropertyType));
+                    }
                 }
-                else CachedTypes.Add(type, type);
+                else
+                {
+                    CachedTypes.Add(type, type);
+                }
             }
             return CachedTypes[type];
         }
