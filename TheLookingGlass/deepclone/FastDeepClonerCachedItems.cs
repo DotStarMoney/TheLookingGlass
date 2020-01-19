@@ -16,22 +16,20 @@ namespace TheLookingGlass.DeepClone
     {
         internal delegate object ObjectActivator();
         internal delegate object ObjectActivatorWithParameters(params object[] args);
-        private static readonly SafeValueType<Type, SafeValueType<string, IFastDeepClonerProperty>> CachedFields = new SafeValueType<Type, SafeValueType<string, IFastDeepClonerProperty>>();
-        private static readonly SafeValueType<Type, SafeValueType<string, IFastDeepClonerProperty>> CachedPropertyInfo = new SafeValueType<Type, SafeValueType<string, IFastDeepClonerProperty>>();
-        private static readonly SafeValueType<Type, Type> CachedTypes = new SafeValueType<Type, Type>();
-        private static readonly SafeValueType<string, ConstructorInfo> ConstructorInfo = new SafeValueType<string, ConstructorInfo>();
-        private static readonly SafeValueType<string, ObjectActivator> CachedDynamicMethod = new SafeValueType<string, ObjectActivator>();
-        private static readonly SafeValueType<string, ObjectActivatorWithParameters> CachedDynamicMethodWithParameters = new SafeValueType<string, ObjectActivatorWithParameters>();
+        private static readonly Dictionary<Type, Dictionary<string, FastDeepClonerProperty>> CachedFields = new Dictionary<Type, Dictionary<string, FastDeepClonerProperty>>();
+        private static readonly Dictionary<Type, Dictionary<string, FastDeepClonerProperty>> CachedPropertyInfo = new Dictionary<Type, Dictionary<string, FastDeepClonerProperty>>();
+        private static readonly Dictionary<Type, Type> CachedTypes = new Dictionary<Type, Type>();
+        private static readonly Dictionary<string, ConstructorInfo> ConstructorInfo = new Dictionary<string, ConstructorInfo>();
+        private static readonly Dictionary<string, ObjectActivator> CachedDynamicMethod = new Dictionary<string, ObjectActivator>();
+        private static readonly Dictionary<string, ObjectActivatorWithParameters> CachedDynamicMethodWithParameters = new Dictionary<string, ObjectActivatorWithParameters>();
 
         internal static ConstructorInfo GetConstructorInfo(this Type type, params object[] parameters)
         {
-
-            IEnumerable<ConstructorInfo> constructors;
             var key = type.FullName + string.Join("", parameters?.Select(x => x.GetType()));
             if (ConstructorInfo.ContainsKey(key))
-                return ConstructorInfo.Get(key);
+                return ConstructorInfo.SafeGet(key);
 
-            constructors = type.GetConstructors();
+            IEnumerable<ConstructorInfo> constructors = type.GetConstructors();
 
             ConstructorInfo constructor = null;
             foreach (var cr in constructors)
@@ -79,7 +77,7 @@ namespace TheLookingGlass.DeepClone
                 }
             }
 
-            return ConstructorInfo.GetOrAdd(key, constructor);
+            return ConstructorInfo.SafeGetOrAdd(key, constructor);
         }
 
         internal static object Creator(this Type type, bool validateArgs = true, params object[] parameters)
@@ -154,11 +152,9 @@ namespace TheLookingGlass.DeepClone
                         ilGenerator.Emit(System.Reflection.Emit.OpCodes.Ret);
 
                         if (!constParam.Any())
-                            return CachedDynamicMethod.GetOrAdd(key, (ObjectActivator)dynamicMethod.CreateDelegate(typeof(ObjectActivator)))();
-                        else
-                        {
-                            return CachedDynamicMethodWithParameters.GetOrAdd(key, (ObjectActivatorWithParameters)dynamicMethod.CreateDelegate(typeof(ObjectActivatorWithParameters)))(parameters);
-                        }
+                            return CachedDynamicMethod.SafeGetOrAdd(key, (ObjectActivator)dynamicMethod.CreateDelegate(typeof(ObjectActivator)))();
+                        
+                        return CachedDynamicMethodWithParameters.SafeGetOrAdd(key, (ObjectActivatorWithParameters)dynamicMethod.CreateDelegate(typeof(ObjectActivatorWithParameters)))(parameters);
                     }
 
                 }
@@ -173,36 +169,47 @@ namespace TheLookingGlass.DeepClone
             }
         }
 
-        internal static Dictionary<string, IFastDeepClonerProperty> GetFastDeepClonerProperties(this Type primaryType)
+        internal static Dictionary<string, FastDeepClonerProperty> GetFastDeepClonerProperties(this Type primaryType)
         {
-            if (!CachedPropertyInfo.ContainsKey(primaryType))
+            if (CachedPropertyInfo.ContainsKey(primaryType)) return CachedPropertyInfo[primaryType];
+
+            var properties = new Dictionary<string, FastDeepClonerProperty>();
+            foreach (var runtimeProperty in primaryType.GetRuntimeProperties())
             {
-                var properties = new SafeValueType<string, IFastDeepClonerProperty>();
-                if (primaryType.GetTypeInfo().BaseType != null && primaryType.GetTypeInfo().BaseType.Name != "Object")
-                {
-                    primaryType.GetRuntimeProperties().Where(x => properties.TryAdd(x.Name, new FastDeepClonerProperty(x))).ToList();
-                    primaryType.GetTypeInfo().BaseType.GetRuntimeProperties().Where(x => properties.TryAdd(x.Name, new FastDeepClonerProperty(x))).ToList();
-                }
-                else primaryType.GetRuntimeProperties().Where(x => properties.TryAdd(x.Name, new FastDeepClonerProperty(x))).ToList();
-                CachedPropertyInfo.Add(primaryType, properties);
+                properties.SafeTryAdd(runtimeProperty.Name, new FastDeepClonerProperty(runtimeProperty));
             }
+
+            if (primaryType.GetTypeInfo().BaseType != null && primaryType.GetTypeInfo().BaseType.Name != "Object")
+            {
+                foreach (var runtimeProperty in primaryType.GetTypeInfo().BaseType.GetRuntimeProperties())
+                {
+                    properties.SafeTryAdd(runtimeProperty.Name, new FastDeepClonerProperty(runtimeProperty));
+                }
+            }
+            
+            CachedPropertyInfo.Add(primaryType, properties);
             return CachedPropertyInfo[primaryType];
         }
 
-        internal static Dictionary<string, IFastDeepClonerProperty> GetFastDeepClonerFields(this Type primaryType)
+        internal static Dictionary<string, FastDeepClonerProperty> GetFastDeepClonerFields(this Type primaryType)
         {
-            if (!CachedFields.ContainsKey(primaryType))
-            {
-                var properties = new SafeValueType<string, IFastDeepClonerProperty>();
-                if (primaryType.GetTypeInfo().BaseType != null && primaryType.GetTypeInfo().BaseType.Name != "Object")
-                {
-                    primaryType.GetRuntimeFields().Where(x => properties.TryAdd(x.Name, new FastDeepClonerProperty(x))).ToList();
-                    primaryType.GetTypeInfo().BaseType.GetRuntimeFields().Where(x => properties.TryAdd(x.Name, new FastDeepClonerProperty(x))).ToList();
+            if (CachedFields.ContainsKey(primaryType)) return CachedFields[primaryType];
 
-                }
-                else primaryType.GetRuntimeFields().Where(x => properties.TryAdd(x.Name, new FastDeepClonerProperty(x))).ToList();
-                CachedFields.Add(primaryType, properties);
+            var properties = new Dictionary<string, FastDeepClonerProperty>();
+            foreach (var runtimeField in primaryType.GetRuntimeFields())
+            {
+                properties.SafeTryAdd(runtimeField.Name, new FastDeepClonerProperty(runtimeField));
             }
+
+            if (primaryType.GetTypeInfo().BaseType != null && primaryType.GetTypeInfo().BaseType.Name != "Object")
+            {
+                foreach (var runtimeField in primaryType.GetTypeInfo().BaseType.GetRuntimeFields())
+                {
+                    properties.SafeTryAdd(runtimeField.Name, new FastDeepClonerProperty(runtimeField));
+                }
+            }
+
+            CachedFields.Add(primaryType, properties);
             return CachedFields[primaryType];
         }
 

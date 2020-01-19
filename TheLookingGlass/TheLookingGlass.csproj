@@ -51,9 +51,8 @@
     <Compile Include="deepclone\FastDeepClonerCachedItems.cs" />
     <Compile Include="deepclone\FastDeepClonerIgnore.cs" />
     <Compile Include="deepclone\FastDeepClonerProperty.cs" />
-    <Compile Include="deepclone\IFastDeepClonerProperty.cs" />
     <Compile Include="deepclone\ReferenceClone.cs" />
-    <Compile Include="deepclone\SafeValueType.cs" />
+    <Compile Include="deepclone\DictionaryExtensions.cs" />
     <Compile Include="core\IAdvanceable.cs" />
     <Compile Include="math\ITransformable.cs" />
     <Compile Include="math\Transform.cs" />

@@ -9,7 +9,7 @@ namespace TheLookingGlass.DeepClone
     internal class ReferenceClone
     {
         private object ReferenceTypeClone(
-            Dictionary<string, IFastDeepClonerProperty> properties, 
+            Dictionary<string, FastDeepClonerProperty> properties, 
             Type primaryType, 
             object objectToBeCloned, 
             object appendToValue = null)

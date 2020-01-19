@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace TheLookingGlass.DeepClone
 {
-    public class FastDeepClonerProperty : IFastDeepClonerProperty
+    public class FastDeepClonerProperty
     {
         public Func<object, object> GetMethod { get; set; }
 
@@ -68,7 +68,7 @@ namespace TheLookingGlass.DeepClone
 
         public IEnumerable<T> GetCustomAttributes<T>() where T : Attribute
         {
-            return ContainAttribute<T>() ? Attributes.Where(x => x is T).Select(x => x as T) : new List<T>();
+            return ContainAttribute<T>() ? Attributes.OfType<T>() : new List<T>();
         }
 
         public IEnumerable<Attribute> GetCustomAttributes(Type type)

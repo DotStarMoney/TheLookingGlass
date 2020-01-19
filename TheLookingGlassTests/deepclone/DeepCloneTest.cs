@@ -18,9 +18,10 @@ namespace TheLookingGlassTests.DeepClone
         [TestMethod]
         public void DeepClone_ClonesUserDefinedType()
         {
-            IList<NestTest> a = new List<NestTest>();
-            
-            a.Add(new NestTest { anInt = 1});
+            IList<NestTest> a = new List<NestTest>
+            {
+                new NestTest { anInt = 1 }
+            };
             a[0].objectArray = new object[] { new Dictionary<int, int>() };
             
             IList<NestTest> b = a.DeepClone();
