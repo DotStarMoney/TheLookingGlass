@@ -21,12 +21,5 @@ namespace TheLookingGlass.DeepClone
             base.Add(attr);
 
         }
-
-        public new void Remove(Attribute attr)
-        {
-            this.Remove(attr);
-            ContainedAttributestypes.Remove(attr.GetType());
-        }
-
     }
 }
