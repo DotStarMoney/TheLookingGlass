@@ -11,8 +11,8 @@ namespace TheLookingGlassTests.DeepClone
     {
 
         public class NestTest {
-            public object[] objectArray;
-            public int anInt;
+            public object[] ObjectArray;
+            public int AnInt;
         }
 
         [TestMethod]
@@ -20,15 +20,19 @@ namespace TheLookingGlassTests.DeepClone
         {
             IList<NestTest> a = new List<NestTest>
             {
-                new NestTest { anInt = 1 }
+                new NestTest { AnInt = 1 }
             };
-            a[0].objectArray = new object[] { new Dictionary<int, int>() };
+            var dict = new Dictionary<int, int> {{ 3, 10 }};
+            a[0].ObjectArray = new object[] {dict};
             
-            IList<NestTest> b = a.DeepClone();
+            var b = a.DeepClone();
 
-            NestTest d = new NestTest();
-            string ds = d.GetType().GetRuntimeFields().ToString();
-
+            Assert.AreEqual(a.Count, b.Count);
+            Assert.AreEqual(a[0].AnInt, b[0].AnInt);
+            Assert.AreEqual(((IDictionary<int, int>) a[0].ObjectArray[0]).Count,
+                ((IDictionary<int, int>) b[0].ObjectArray[0]).Count);
+            Assert.AreEqual(((IDictionary<int, int>)a[0].ObjectArray[0])[3],
+                ((IDictionary<int, int>)b[0].ObjectArray[0])[3]);
         }
     }
 }

@@ -11,37 +11,10 @@ namespace TheLookingGlass.DeepClone
         private static readonly HashSet<string> StringListPropertyKeys = 
             new HashSet<string>(typeof(List<string>).GetCachedProperties().Keys);
 
+        /// <summary>WARNING: This method is not even remotely thread-safe!</summary>
         public static T DeepClone<T>(this T objectToBeCloned) where T : class
         {
             return (T) DeepCloneImpl(objectToBeCloned);
-        }
-
-        private static object CloneReference(
-            in Dictionary<string, ObjectVariable> properties, 
-            in Type primaryType, 
-            in object objectToBeCloned, 
-            in object appendToValue = null)
-        {
-            var resObject = appendToValue ?? primaryType.Creator();
-
-            foreach (var property in properties.Values)
-            {
-                if (!property.CanRead || property.Uncloneable) continue;
-
-                var value = property.GetValue(objectToBeCloned);
-                if (value == null) continue;
-
-                if (property.IsInternalType || value.GetType().IsInternalType())
-                {
-                    property.SetValue(resObject, value);
-                }
-                else
-                {
-                    property.SetValue(resObject, DeepCloneImpl(value));
-                }
-            }
-
-            return resObject;
         }
 
         internal static object DeepCloneImpl(in object objectToBeCloned)
@@ -134,14 +107,42 @@ namespace TheLookingGlass.DeepClone
             else
             {
                 var typeProperties = primaryType.GetCachedProperties();
-                clonedObject = CloneReference(typeProperties, primaryType, objectToBeCloned);
+                clonedObject = DeepCloneReference(typeProperties, primaryType, objectToBeCloned);
 
                 var typeFields = primaryType.GetCachedFieldsExcludingProperties(typeProperties);
-                clonedObject = CloneReference(
+                clonedObject = DeepCloneReference(
                     typeFields, primaryType, objectToBeCloned, clonedObject);
             }
 
             return clonedObject;
+        }
+
+        private static object DeepCloneReference(
+            in Dictionary<string, ObjectVariable> properties,
+            in Type primaryType,
+            in object objectToBeCloned,
+            in object appendToValue = null)
+        {
+            var resObject = appendToValue ?? primaryType.Creator();
+
+            foreach (var property in properties.Values)
+            {
+                if (!property.CanRead || property.Uncloneable) continue;
+
+                var value = property.GetValue(objectToBeCloned);
+                if (value == null) continue;
+
+                if (property.IsInternalType || value.GetType().IsInternalType())
+                {
+                    property.SetValue(resObject, value);
+                }
+                else
+                {
+                    property.SetValue(resObject, DeepCloneImpl(value));
+                }
+            }
+
+            return resObject;
         }
     }
 }
