@@ -13,12 +13,12 @@ namespace TheLookingGlass.ActorModel
         private struct ActorRecord
         { 
             internal readonly Actor Actor;
-            internal readonly bool DeltaCloneable;
+            internal readonly bool GroupStable;
 
-            internal ActorRecord(in Actor actor, in bool deltaCloneable)
+            internal ActorRecord(in Actor actor, in bool groupStable)
             {
                 Actor = actor;
-                DeltaCloneable = deltaCloneable;
+                GroupStable = groupStable;
             }
         }
 
@@ -39,6 +39,13 @@ namespace TheLookingGlass.ActorModel
 
         public void Remove(Actor actor)
         {
+            // We need to track things that are deleted for the sake of MergeIn:
+            //   - leave things around in a dead state until the next complete clone
+            // X - keep a record around of things that were deleted and also stuck around from the previous
+            //     clone
+            //   - some sort of "deleted" delta state
+
+
             Contract.Assert(actor.ParentBank == this);
 
             var group = (int) actor.ParentBankGroup;
@@ -64,14 +71,16 @@ namespace TheLookingGlass.ActorModel
             actor.ParentBankId = claimId;
         }
 
-        public void MergeInActive(in ActorBank bank)
+        public void MergeIn(in ActorBank bank)
         {
-            
+            // Merges in everything in bank, overwriting things with equivalent creationIds and setting all groupStable states to true
+            //
+            // things that were deleted need to be tracked here too
         }
 
         public ActorBank Clone(in bool deltaClone = false)
         {
-
+            // if deltaClone, clones everything in active and everything else marked (groupStable=false)
         }
     }
 }
