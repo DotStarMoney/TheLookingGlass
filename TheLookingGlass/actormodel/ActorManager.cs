@@ -2,16 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace TheLookingGlass.actormodel
+namespace TheLookingGlass.ActorModel
 {
     public class ActorManager
     {
+        private long _creationIdCounter = 0;
 
-        internal void send()
-        {
-
-        }
+        internal long GetCreationId() => Interlocked.Increment(ref _creationIdCounter);
     }
 }

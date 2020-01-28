@@ -52,7 +52,7 @@
     <Compile Include="deepclone\ObjectVariable.cs" />
     <Compile Include="deepclone\DeepCloner.cs" />
     <Compile Include="deepclone\DictionaryExtensions.cs" />
-    <Compile Include="core\IAdvanceable.cs" />
+    <Compile Include="game\actors\SampleActor.cs" />
     <Compile Include="math\ITransformable.cs" />
     <Compile Include="math\Transform.cs" />
     <Compile Include="util\ClaimCheck.cs" />
