@@ -2,21 +2,25 @@
 
 namespace TheLookingGlass.ActorModel
 {
-    public abstract class Actor
+    public abstract class Actor<TState> : ActorBase
     {
-        [Uncloneable] internal ActorBank ParentBank { get; set; }
-        [Uncloneable] internal ActorBank.Group ParentBankGroup { get; set; }
-        [Uncloneable] internal int ParentBankId { get; set; }
+        private TState _state;
 
-        internal readonly long CreationId;
-
-        protected Actor(ActorManager manager)
+        protected Actor(ActorManager manager) : base(manager)
         {
-            CreationId = manager.GetCreationId();
+
+
         }
 
-        internal bool IsDetached() => ParentBank == null;
+        protected ref readonly TState State => ref _state;
 
-        internal void Detach() => ParentBank = null;
+        protected ref readonly TState MutableState
+        {
+            get
+            {
+                MarkMutated();
+                return ref _state;
+            }
+        }
     }
 }

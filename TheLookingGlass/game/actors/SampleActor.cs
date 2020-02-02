@@ -3,15 +3,24 @@ using TheLookingGlass.DeepClone;
 
 namespace TheLookingGlass.Game.Actors
 {
-    class SampleActor : Actor
-    {
-        private string _hidden;
-        private int _savedInt;
-
-        public SampleActor(int anInt, string test)
+    public class SampleActor : Actor<SampleActor.Vars>
+    { 
+        public class Vars
         {
-            _savedInt = anInt;
-            _hidden = test;
+            internal string _hidden;
+            internal int _savedInt;
+        }
+
+        public SampleActor(in ActorManager actorManager) : base(actorManager)
+        { 
+            
+        }
+
+        private void DoStuff()
+        {
+
+            MutableState._hidden = "";
+
         }
     }
 }

@@ -1,86 +1,161 @@
 ﻿using System.Collections.Generic;
 using System.Diagnostics.Contracts;
-using TheLookingGlass.Util;
+using TheLookingGlass.DeepClone;
 
 namespace TheLookingGlass.ActorModel
 {
     public class ActorBank
     {
-        private const int GroupN = 3;
-
-        public enum Group { Active = 0, Idling = 1, Sleeping = 2 }
-
-        private struct ActorRecord
-        { 
-            internal readonly Actor Actor;
-            internal readonly bool GroupStable;
-
-            internal ActorRecord(in Actor actor, in bool groupStable)
-            {
-                Actor = actor;
-                GroupStable = groupStable;
-            }
+        public enum Group
+        {
+            Active = 0,
+            Sleeping = 1
         }
 
-        private readonly ClaimCheck<ActorRecord>[] _groups = new ClaimCheck<ActorRecord>[GroupN];
-        private readonly Dictionary<long, Actor>[] _creationIdToActor = new Dictionary<long, Actor>[GroupN];
+        private const int GroupN = 2;
 
-        public void Add(Actor actor, in Group initialGroup = Group.Active)
+        private readonly IList<ActorManager.ActorCreationId> _deletedCreationIds;
+
+        private readonly Dictionary<ActorManager.ActorCreationId, ActorBankRecord>[] _groups =
+            new Dictionary<ActorManager.ActorCreationId, ActorBankRecord>[GroupN];
+
+        public ActorBank()
+        {
+            _deletedCreationIds = new List<ActorManager.ActorCreationId>();
+        }
+
+        private ActorBank(in IList<ActorManager.ActorCreationId> deletedCreationIds)
+        {
+            _deletedCreationIds = new List<ActorManager.ActorCreationId>(deletedCreationIds);
+        }
+
+        public void Add(ActorBase actor, in Group initialGroup = Group.Active)
         {
             Contract.Assert(actor.IsDetached());
 
-            _creationIdToActor[(int)initialGroup][actor.CreationId] = actor;
-            var claimId = _groups[(int)initialGroup].Add(new ActorRecord(actor, false));
+            var record = new ActorBankRecord(this, actor, initialGroup);
+            _groups[(int) initialGroup].Add(actor.CreationId, record);
 
-            actor.ParentBank = this;
-            actor.ParentBankGroup = initialGroup;
-            actor.ParentBankId = claimId;
+            record.CreatedSinceLastClone = true;
+            record.Stable = false;
+
+            actor.ParentRecord = record;
         }
 
-        public void Remove(Actor actor)
+        public void Remove(ActorBase actor)
         {
-            // We need to track things that are deleted for the sake of MergeIn:
-            //   - leave things around in a dead state until the next complete clone
-            // X - keep a record around of things that were deleted and also stuck around from the previous
-            //     clone
-            //   - some sort of "deleted" delta state
+            var record = actor.ParentRecord;
+            Contract.Assert(record.Parent == this);
 
-
-            Contract.Assert(actor.ParentBank == this);
-
-            var group = (int) actor.ParentBankGroup;
-            _groups[group].Remove(actor.ParentBankId);
-            _creationIdToActor[group].Remove(actor.CreationId);
+            var group = _groups[(int) record.Group];
+            if (!record.CreatedSinceLastClone) _deletedCreationIds.Add(actor.CreationId);
+            group.Remove(actor.CreationId);
 
             actor.Detach();
         }
 
-        public void ChangeActorGroup(Actor actor, in Group newGroup)
+        public void ChangeActorGroup(ActorBase actor, in Group newGroup)
         {
-            Contract.Assert(actor.ParentBank == this);
-            if (actor.ParentBankGroup == newGroup) return;
+            var record = actor.ParentRecord;
+            Contract.Assert(record.Parent == this);
+            if (record.Group == newGroup) return;
 
-            var group = (int)actor.ParentBankGroup;
-            _groups[group].Remove(actor.ParentBankId);
-            _creationIdToActor[group].Remove(actor.CreationId);
+            record.Stable = false;
+            record.Group = newGroup;
 
-            _creationIdToActor[(int) newGroup][actor.CreationId] = actor;
-            var claimId = _groups[(int) newGroup].Add(new ActorRecord(actor, false));
-
-            actor.ParentBankGroup = newGroup;
-            actor.ParentBankId = claimId;
+            _groups[(int) record.Group].Remove(actor.CreationId);
+            _groups[(int) newGroup].Add(actor.CreationId, record);
         }
 
         public void MergeIn(in ActorBank bank)
         {
-            // Merges in everything in bank, overwriting things with equivalent creationIds and setting all groupStable states to true
-            //
-            // things that were deleted need to be tracked here too
+            foreach (var deletedId in bank._deletedCreationIds)
+            {
+                for (var g = 0; g < GroupN; ++g) _groups[g].Remove(deletedId);
+            }
+
+            for (var g = 0; g < GroupN; ++g)
+            {
+                foreach (var record in bank._groups[g].Values) AddOrUpdateRecord(record);
+            }
+        }
+
+        private void AddOrUpdateRecord(in ActorBankRecord record)
+        {
+            var existingRecord = GetMatchingRecord(record);
+            if (existingRecord == null)
+            {
+                CloneRecordIntoBank(this, record);
+            }
+            else
+            {
+                existingRecord.Actor = record.Actor.DeepClone();
+            }
+        }
+
+        private ActorBankRecord GetMatchingRecord(in ActorBankRecord record)
+        {
+            ActorBankRecord existingRecord;
+            _groups[(int) record.Group].TryGetValue(record.Actor.CreationId, out existingRecord);
+            if (existingRecord != null) return existingRecord;
+
+            for (var g = 0; g < GroupN; ++g)
+            {
+                if ((Group) g == record.Group) continue;
+                _groups[g].TryGetValue(record.Actor.CreationId, out existingRecord);
+                if (existingRecord != null) return existingRecord;
+            }
+
+            return null;
         }
 
         public ActorBank Clone(in bool deltaClone = false)
         {
-            // if deltaClone, clones everything in active and everything else marked (groupStable=false)
+            var newBank = deltaClone ? new ActorBank(_deletedCreationIds) : new ActorBank();
+            _deletedCreationIds.Clear();
+
+            for (var g = 0; g < GroupN; ++g)
+            {
+                foreach (var record in _groups[g].Values)
+                {
+                    if (deltaClone && record.Stable) continue;
+                    CloneRecordIntoBank(newBank, record);
+                }
+            }
+
+            return newBank;
+        }
+
+        private static void CloneRecordIntoBank(ActorBank parent, in ActorBankRecord record)
+        {
+            var newActor = record.Actor.DeepClone();
+            var newRecord = new ActorBankRecord(parent, newActor, record.Group);
+            newActor.ParentRecord = newRecord;
+
+            newRecord.CreatedSinceLastClone = false;
+            newRecord.Stable = true;
+
+            parent._groups[(int) record.Group].Add(newActor.CreationId, record);
+        }
+
+        internal class ActorBankRecord
+        {
+            internal ActorBase Actor;
+
+            internal bool CreatedSinceLastClone;
+
+            internal Group Group;
+
+            internal ActorBank Parent;
+
+            internal bool Stable;
+
+            internal ActorBankRecord(in ActorBank parent, in ActorBase actor, in Group group)
+            {
+                Actor = actor;
+                Parent = parent;
+                Group = group;
+            }
         }
     }
 }
