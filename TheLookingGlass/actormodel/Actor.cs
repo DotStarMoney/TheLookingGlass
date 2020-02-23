@@ -18,7 +18,7 @@ namespace TheLookingGlass.ActorModel
         {
             get
             {
-                MarkMutated();
+                Updates.Mutated = true;
                 return ref _state;
             }
         }

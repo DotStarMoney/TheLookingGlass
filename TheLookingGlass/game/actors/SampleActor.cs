@@ -11,10 +11,7 @@ namespace TheLookingGlass.Game.Actors
             internal int _savedInt;
         }
 
-        public SampleActor(in ActorManager actorManager) : base(actorManager)
-        { 
-            
-        }
+        public SampleActor(in ActorManager actorManager) : base(actorManager) { }
 
         private void DoStuff()
         {

@@ -50,6 +50,7 @@
     <Compile Include="actormodel\ActorBank.cs" />
     <Compile Include="actormodel\ActorBase.cs" />
     <Compile Include="actormodel\ActorManager.cs" />
+    <Compile Include="actormodel\IAdvanceable.cs" />
     <Compile Include="deepclone\IndexedAttributes.cs" />
     <Compile Include="deepclone\TypeCheckingExtensions.cs" />
     <Compile Include="deepclone\ReflectionCache.cs" />

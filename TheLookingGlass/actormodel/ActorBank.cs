@@ -4,12 +4,13 @@ using TheLookingGlass.DeepClone;
 
 namespace TheLookingGlass.ActorModel
 {
-    public class ActorBank
+    public class ActorBank : IAdvanceable
     {
         public enum Group
         {
             Active = 0,
-            Sleeping = 1
+            Sleeping = 1,
+            Unknown = -1
         }
 
         private const int GroupN = 2;
@@ -40,6 +41,7 @@ namespace TheLookingGlass.ActorModel
             record.Stable = false;
 
             actor.ParentRecord = record;
+            actor.Updates.Group = initialGroup;
         }
 
         public void Remove(ActorBase actor)
@@ -95,8 +97,7 @@ namespace TheLookingGlass.ActorModel
 
         private ActorBankRecord GetMatchingRecord(in ActorBankRecord record)
         {
-            ActorBankRecord existingRecord;
-            _groups[(int) record.Group].TryGetValue(record.Actor.CreationId, out existingRecord);
+            _groups[(int) record.Group].TryGetValue(record.Actor.CreationId, out var existingRecord);
             if (existingRecord != null) return existingRecord;
 
             for (var g = 0; g < GroupN; ++g)
@@ -109,7 +110,7 @@ namespace TheLookingGlass.ActorModel
             return null;
         }
 
-        public ActorBank Clone(in bool deltaClone = false)
+        public ActorBank CloneAnd(in bool deltaClone = false)
         {
             var newBank = deltaClone ? new ActorBank(_deletedCreationIds) : new ActorBank();
             _deletedCreationIds.Clear();
@@ -155,6 +156,29 @@ namespace TheLookingGlass.ActorModel
                 Actor = actor;
                 Parent = parent;
                 Group = group;
+            }
+        }
+
+        public void Advance(float deltaT)
+        {
+            // TODO: Parallelize implementation
+            foreach (var record in _groups[(int) Group.Active].Values)
+            {
+                if (record.Actor is IAdvanceable)
+                {
+                    ((IAdvanceable) record.Actor).Advance(deltaT);
+                }
+            }
+
+            foreach (var record in _groups[(int)Group.Active].Values)
+            {
+                var updates = record.Actor.Updates;
+                if (updates.Mutated)
+                {
+
+                }
+
+                record.Actor.ResetUpdates();
             }
         }
     }
