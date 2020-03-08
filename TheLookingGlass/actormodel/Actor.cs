@@ -4,7 +4,7 @@ namespace TheLookingGlass.ActorModel
 {
     public abstract class Actor<TState> : ActorBase
     {
-        private TState _state;
+        private readonly TState _state;
 
         protected Actor(ActorManager manager) : base(manager)
         {

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using TheLookingGlass.DeepClone;
 
@@ -8,8 +9,11 @@ namespace TheLookingGlass.ActorModel
     {
         public enum Group
         {
+            // Actors perform their synchronous Advance method
             Active = 0,
+            // Actors don't perform their synchronous Advance method (or don't have one)
             Sleeping = 1,
+            // Unbound state.
             Unknown = -1
         }
 
@@ -30,9 +34,14 @@ namespace TheLookingGlass.ActorModel
             _deletedCreationIds = new List<ActorManager.ActorCreationId>(deletedCreationIds);
         }
 
-        public void Add(ActorBase actor, in Group initialGroup = Group.Active)
+        public void Add(ActorBase actor, Group initialGroup = Group.Active)
         {
             Contract.Assert(actor.IsDetached());
+
+            if (!(actor is IAdvanceable))
+            {
+                initialGroup = Group.Sleeping;
+            }
 
             var record = new ActorBankRecord(this, actor, initialGroup);
             _groups[(int) initialGroup].Add(actor.CreationId, record);
@@ -50,8 +59,7 @@ namespace TheLookingGlass.ActorModel
             Contract.Assert(record.Parent == this);
 
             var group = _groups[(int) record.Group];
-            if (!record.CreatedSinceLastClone) _deletedCreationIds.Add(actor.CreationId);
-            group.Remove(actor.CreationId);
+            RemoveActorFromGroup(actor, group);
 
             actor.Detach();
         }
@@ -59,9 +67,12 @@ namespace TheLookingGlass.ActorModel
         public void ChangeActorGroup(ActorBase actor, in Group newGroup)
         {
             var record = actor.ParentRecord;
+            // This should also catch any unbound actors (though doesn't tell us what is wrong).
             Contract.Assert(record.Parent == this);
             if (record.Group == newGroup) return;
 
+            Contract.Assert((actor is IAdvanceable) || (newGroup == Group.Sleeping));
+            
             record.Stable = false;
             record.Group = newGroup;
 
@@ -110,7 +121,7 @@ namespace TheLookingGlass.ActorModel
             return null;
         }
 
-        public ActorBank CloneAnd(in bool deltaClone = false)
+        public ActorBank Clone(in bool deltaClone = false)
         {
             var newBank = deltaClone ? new ActorBank(_deletedCreationIds) : new ActorBank();
             _deletedCreationIds.Clear();
@@ -162,24 +173,64 @@ namespace TheLookingGlass.ActorModel
         public void Advance(float deltaT)
         {
             // TODO: Parallelize implementation
-            foreach (var record in _groups[(int) Group.Active].Values)
-            {
-                if (record.Actor is IAdvanceable)
-                {
-                    ((IAdvanceable) record.Actor).Advance(deltaT);
-                }
-            }
 
-            foreach (var record in _groups[(int)Group.Active].Values)
+            // 1) Advance everyone who isn't asleep.
+            var syncUpdateGroup = _groups[(int)Group.Active].Values;
+            AdvanceActors(syncUpdateGroup, deltaT);
+
+            // 2) Deal with anyone who requested a state update.
+            ProcessActorUpdates(syncUpdateGroup);
+
+
+            
+
+        }
+
+        // Assumes all actors are advanceable.
+        private void AdvanceActors(IEnumerable<ActorBankRecord> actorRecords, float deltaT)
+        {
+            foreach (var record in actorRecords)
             {
+                ((IAdvanceable)record.Actor).Advance(deltaT);
+            }
+        }
+
+        // Book keeping to take care of actor update signals.
+        private void ProcessActorUpdates(IEnumerable<ActorBankRecord> actorRecords)
+        {
+            foreach (var record in actorRecords)
+            {
+                var actor = record.Actor;
                 var updates = record.Actor.Updates;
-                if (updates.Mutated)
-                {
 
+                if (updates.Exited)
+                {
+                    RemoveActorFromGroup(actor, _groups[(int) record.Group]);
+                    actor.Detach();
+                    continue;
                 }
 
-                record.Actor.ResetUpdates();
+                // Note we ignore requests to switch groups for actors that are not advanceable.
+                var stableGroup = (updates.Group == record.Group) || !(actor is IAdvanceable);
+                if (!stableGroup)
+                {
+                    _groups[(int)record.Group].Remove(actor.CreationId);
+                    _groups[(int)updates.Group].Add(actor.CreationId, record);
+                    record.Group = updates.Group;
+                }
+
+                record.Stable = stableGroup && !updates.Mutated;
+                actor.ResetUpdates();
+                // We do this in case the actor requested a group switch and we ignored it.
+                actor.Updates.Group = record.Group;
             }
+        }
+
+        private void RemoveActorFromGroup(
+            ActorBase actor, Dictionary<ActorManager.ActorCreationId, ActorBankRecord> group)
+        {
+            if (!actor.ParentRecord.CreatedSinceLastClone) _deletedCreationIds.Add(actor.CreationId);
+            group.Remove(actor.CreationId);
         }
     }
 }

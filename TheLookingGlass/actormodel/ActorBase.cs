@@ -22,14 +22,19 @@ namespace TheLookingGlass.ActorModel
         protected ActorBase(ActorManager manager)
         {
             CreationId = manager.GetCreationId();
-            Updates.Mutated = false;
-            Updates.Exited = false;
-            Updates.Group = ActorBank.Group.Unknown;
+            InitUpdateSignals(ref Updates);
+        }
+
+        private static void InitUpdateSignals(ref UpdateSignals updates)
+        {
+            updates.Mutated = false;
+            updates.Exited = false;
+            updates.Group = ActorBank.Group.Unknown;
         }
 
         [Uncloneable] internal ActorBank.ActorBankRecord ParentRecord { get; set; }
 
-        protected void ResetUpdates()
+        internal void ResetUpdates()
         {
             // Just the mutated flag needs resetting.
             Updates.Mutated = false;
